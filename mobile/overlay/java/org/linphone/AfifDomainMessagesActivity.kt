@@ -110,6 +110,12 @@ class AfifDomainMessagesActivity : Activity() {
                 )
             }
             AfifTheme.applyBubble(row, m.outgoing)
+            row.setOnClickListener {
+                startActivity(
+                    android.content.Intent(this, AfifDomainThreadActivity::class.java)
+                        .putExtra("address", m.address)
+                )
+            }
             list.addView(row, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT

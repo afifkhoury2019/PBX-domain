@@ -60,6 +60,15 @@ object AfifSmsStore {
         }
     }
 
+    fun thread(context: Context, address: String): List<AfifSms> =
+        all(context).filter { it.address.equals(address, ignoreCase = true) }
+
+    fun conversations(context: Context): List<Pair<String, AfifSms>> =
+        all(context)
+            .groupBy { it.address }
+            .mapNotNull { (address, list) -> list.maxByOrNull { it.time }?.let { address to it } }
+            .sortedByDescending { it.second.time }
+
     fun fmt(time: Long): String =
         SimpleDateFormat("dd MMM HH:mm", Locale.getDefault()).format(Date(time))
 }
