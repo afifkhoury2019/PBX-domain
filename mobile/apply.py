@@ -116,7 +116,7 @@ edit(gb, 'output.outputFileName = "linphone-android-${variant.buildType.name}-$g
      'output.outputFileName = "AFIF-Phone-${variant.buildType.name}.apk"')
 edit(gb, 'abiFilters += listOf("armeabi-v7a", "arm64-v8a")',
      'abiFilters += providers.gradleProperty("afifAbis").getOrElse("armeabi-v7a,arm64-v8a").split(",")')
-edit(gb, "dependencies {", 'dependencies {\n    implementation(project(":tailscale"))', count=1)
+edit(gb, "dependencies {", 'dependencies {\n    implementation(project(":tailscale"))\n    implementation("com.squareup.okhttp3:okhttp:4.12.0")', count=1)
 gs = os.path.join(APP, "google-services.json")
 if os.path.exists(gs):
     os.remove(gs)  # Linphone cloud config only works for the official app
@@ -331,6 +331,7 @@ edit(appkt, "        corePreferences.config = config",
 edit(appkt, "        coreContext.start()",
      "        coreContext.start()\n"
      "        AfifWatchdog.schedule(this)\n"
+     "        AfifTransport.bootstrap(this)\n"
      "        coreContext.postOnCoreThread { core -> AfifDialPlanMigration.applyIfNeeded(core) }")
 
 main = os.path.join(MAIN, "java", "org", "linphone", "ui", "main", "MainActivity.kt")
@@ -352,11 +353,18 @@ manifest = os.path.join(MAIN, "AndroidManifest.xml")
 edit(manifest,
      '    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />',
      '    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />\n'
-     '    <uses-permission android:name="android.permission.WAKE_LOCK" />')
+     '    <uses-permission android:name="android.permission.WAKE_LOCK" />\n'
+     '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n'
+     '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />\n'
+     '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n'
+     '    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />')
 edit(manifest, "<application",
      '<application\n    android:usesCleartextTraffic="true"')
 edit(manifest, "</application>",
      '    <receiver android:name="org.linphone.AfifWatchdogReceiver" android:exported="false" />\n'
+     '    <service android:name=".AfifDomainService" android:exported="false" android:foregroundServiceType="microphone" />\n'
+     '    <activity android:name=".AfifDomainCallActivity" android:exported="false" android:showWhenLocked="true" android:turnScreenOn="true" android:excludeFromRecents="true" android:launchMode="singleTop" />\n'
+     '    <activity android:name=".AfifDomainDialActivity" android:exported="false" android:label="AFIF Direct" />\n'
      '</application>')
 
 # Use the PBX address that matches the current network (Tailscale or LAN).
@@ -890,6 +898,41 @@ edit(ui, "    </androidx.constraintlayout.widget.ConstraintLayout>\n\n</layout>"
      '            app:layout_constraintTop_toBottomOf="@id/afif_voice_title"\n'
      '            app:layout_constraintStart_toStartOf="@id/afif_voice_title"\n'
      '            app:layout_constraintEnd_toEndOf="@id/afif_voice_title" />\n\n'
+     '        <androidx.appcompat.widget.AppCompatTextView\n'
+     '            style="@style/settings_title_padding_style"\n'
+     '            android:id="@+id/afif_connection_title"\n'
+     '            android:layout_width="0dp"\n'
+     '            android:layout_height="wrap_content"\n'
+     '            android:layout_marginTop="20dp"\n'
+     '            android:layout_marginStart="16dp"\n'
+     '            android:layout_marginEnd="16dp"\n'
+     '            android:text="Connection"\n'
+     '            app:layout_constraintTop_toBottomOf="@id/afif_voice_spinner"\n'
+     '            app:layout_constraintStart_toStartOf="parent"\n'
+     '            app:layout_constraintEnd_toEndOf="parent"/>\n\n'
+     '        <androidx.appcompat.widget.AppCompatSpinner\n'
+     '            style="@style/default_text_style"\n'
+     '            android:id="@+id/afif_connection_spinner"\n'
+     '            android:layout_width="0dp"\n'
+     '            android:layout_height="50dp"\n'
+     '            android:background="@drawable/edit_text_background"\n'
+     '            android:paddingStart="@dimen/spinner_start_padding"\n'
+     '            android:paddingEnd="@dimen/spinner_end_padding"\n'
+     '            android:overlapAnchor="false"\n'
+     '            android:spinnerMode="dropdown"\n'
+     '            android:popupBackground="@drawable/shape_squircle_white_background"\n'
+     '            app:layout_constraintTop_toBottomOf="@id/afif_connection_title"\n'
+     '            app:layout_constraintStart_toStartOf="@id/afif_connection_title"\n'
+     '            app:layout_constraintEnd_toEndOf="@id/afif_connection_title" />\n\n'
+     '        <Button\n'
+     '            android:id="@+id/afif_domain_dial"\n'
+     '            android:layout_width="0dp"\n'
+     '            android:layout_height="50dp"\n'
+     '            android:layout_marginTop="10dp"\n'
+     '            android:text="Open direct dialer"\n'
+     '            app:layout_constraintTop_toBottomOf="@id/afif_connection_spinner"\n'
+     '            app:layout_constraintStart_toStartOf="@id/afif_connection_title"\n'
+     '            app:layout_constraintEnd_toEndOf="@id/afif_connection_title" />\n\n'
      '    </androidx.constraintlayout.widget.ConstraintLayout>\n\n</layout>')
 
 settings_fragment = os.path.join(MAIN, "java", "org", "linphone", "ui", "main", "settings", "fragment", "SettingsFragment.kt")
@@ -938,6 +981,20 @@ edit(settings_fragment, "        binding.viewModel = viewModel",
      "                org.linphone.AfifVoiceEffect.setIndex(requireActivity(), position)\n"
      "            }\n"
      "            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}\n"
+     "        }\n"
+     "        val afifTransportAdapter = android.widget.ArrayAdapter(\n"
+     "            requireContext(), R.layout.generic_dropdown_cell, org.linphone.AfifTransport.labels()\n"
+     "        )\n"
+     "        binding.userInterfaceSettings.afifConnectionSpinner.adapter = afifTransportAdapter\n"
+     "        binding.userInterfaceSettings.afifConnectionSpinner.setSelection(org.linphone.AfifTransport.index(requireContext()))\n"
+     "        binding.userInterfaceSettings.afifConnectionSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {\n"
+     "            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {\n"
+     "                org.linphone.AfifTransport.setIndex(requireActivity(), position)\n"
+     "            }\n"
+     "            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}\n"
+     "        }\n"
+     "        binding.userInterfaceSettings.afifDomainDial.setOnClickListener {\n"
+     "            startActivity(android.content.Intent(requireContext(), org.linphone.AfifDomainDialActivity::class.java))\n"
      "        }")
 
 call_activity = os.path.join(MAIN, "java", "org", "linphone", "ui", "call", "CallActivity.kt")

@@ -336,6 +336,8 @@ public sealed class CallManager
             catch (Exception ex) { _log.LogWarning("Could not start recording: {Message}", ex.Message); }
         }
         _log.LogInformation("Call {Id}: connected {A} ⇄ {B}", call.Id, a, b);
+        if (a is AfifPbx.Bridge.WsLeg wa) wa.NotifyAnswered();
+        if (b is AfifPbx.Bridge.WsLeg wb) wb.NotifyAnswered();
         var sipLeg = a.Kind is "sip" or "ws" ? a : b.Kind is "sip" or "ws" ? b : null;
         var effect = call.VoiceEffect;
         if (effect == VoiceEffect.Natural && !string.IsNullOrEmpty(sipLeg?.Extension))

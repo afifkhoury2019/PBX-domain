@@ -54,6 +54,16 @@ public sealed class WsLeg : CallLeg
     /// message for this leg - the WebSocket equivalent of a SIP 200 OK.</summary>
     public void MarkAnsweredByPhone() => MarkAnswered();
 
+    /// <summary>Tell the phone the PBX side answered an outbound call, and mark this leg answered so
+    /// PCM frames start flowing in both directions.</summary>
+    public void NotifyAnswered()
+    {
+        if (State == LegState.Ended) return;
+        if (State != LegState.Answered) MarkAnswered();
+        if (_connection is { IsOpen: true } conn)
+            _ = conn.SendControlAsync(new { type = "answered", callId = CallId });
+    }
+
     /// <summary>Called by <see cref="PhoneConnection.RunAsync"/> for each binary audio frame it receives while
     /// this leg is the connection's active call.</summary>
     public void PushInbound(byte[] bytes)
@@ -64,7 +74,11 @@ public sealed class WsLeg : CallLeg
 
     public override void SendRinging() { /* the "ring" control message already told the phone it's ringing */ }
 
-    public override Task<bool> AnswerAsync() => Task.FromResult(State != LegState.Ended);
+    public override Task<bool> AnswerAsync()
+    {
+        NotifyAnswered();
+        return Task.FromResult(State != LegState.Ended);
+    }
 
     public override void Hangup(string reason = "normal")
     {
