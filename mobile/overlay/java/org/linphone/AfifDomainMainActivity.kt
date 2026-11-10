@@ -54,13 +54,19 @@ class AfifDomainMainActivity : Activity() {
         row.addView(action("Connection") {
             AfifTransport.configure(this) { refresh() }
         }, weight())
-        row.addView(action("Theme") { chooseTheme() }, weight())
+        val row2 = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        row2.addView(action("Theme") { chooseTheme() }, weight())
+        row2.addView(action("Info") { showInfo() }, weight())
 
         list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val scroll = ScrollView(this).apply { addView(list) }
         root.addView(title)
         root.addView(status)
         root.addView(row)
+        root.addView(row2)
         root.addView(scroll, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
         ))
@@ -153,6 +159,25 @@ class AfifDomainMainActivity : Activity() {
             })
             setOnClickListener { click() }
         }
+    }
+
+    private fun showInfo() {
+        val version = try {
+            packageManager.getPackageInfo(packageName, 0).versionName
+        } catch (_: Throwable) { "?" }
+        val text = """
+            Host: ${AfifTransport.host(this)}
+            Extension: ${AfifTransport.extension(this)}
+            Connected: ${AfifDomainService.connected}
+            Last error: ${AfifDomainService.lastError.ifBlank { "none" }}
+            App version: $version
+            Transport: ${if (AfifTransport.isDomain(this)) "Domain WebSocket" else "Tailscale SIP"}
+        """.trimIndent()
+        android.app.AlertDialog.Builder(this)
+            .setTitle("AFIF Direct diagnostics")
+            .setMessage(text)
+            .setPositiveButton("Close", null)
+            .show()
     }
 
     private fun chooseTheme() {
