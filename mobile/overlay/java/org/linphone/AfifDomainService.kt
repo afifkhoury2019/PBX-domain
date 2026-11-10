@@ -18,6 +18,7 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.AudioTrack
+import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.media.Ringtone
 import android.media.RingtoneManager
@@ -25,7 +26,9 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.util.Base64
 import okio.ByteString
+import java.io.File
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -33,6 +36,14 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
+
+data class AfifVoicemail(
+    val id: Long,
+    val from: String,
+    val time: String,
+    val duration: Int,
+    val heard: Boolean
+)
 
 class AfifDomainService : Service() {
     companion object {
@@ -42,6 +53,8 @@ class AfifDomainService : Service() {
         const val ACTION_HANGUP = "org.linphone.AFIF_DOMAIN_HANGUP"
         const val ACTION_DIAL = "org.linphone.AFIF_DOMAIN_DIAL"
         const val ACTION_SMS = "org.linphone.AFIF_DOMAIN_SMS"
+        const val ACTION_VOICEMAIL_LIST = "org.linphone.AFIF_DOMAIN_VOICEMAIL_LIST"
+        const val ACTION_VOICEMAIL_AUDIO = "org.linphone.AFIF_DOMAIN_VOICEMAIL_AUDIO"
         const val ACTION_MUTE = "org.linphone.AFIF_DOMAIN_MUTE"
         const val ACTION_SPEAKER = "org.linphone.AFIF_DOMAIN_SPEAKER"
 
@@ -55,6 +68,8 @@ class AfifDomainService : Service() {
         @Volatile var callName = ""
         @Volatile var callId = ""
         @Volatile var lastError = ""
+        @Volatile var voicemails: List<AfifVoicemail> = emptyList()
+        @Volatile var voicemailError = ""
 
         fun start(context: Context) {
             val i = Intent(context, AfifDomainService::class.java).setAction(ACTION_START)
@@ -86,6 +101,20 @@ class AfifDomainService : Service() {
                 .putExtra("to", to)
                 .putExtra("text", text)
             if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(i) else context.startService(i)
+        }
+
+        fun requestVoicemails(context: Context) {
+            context.startService(
+                Intent(context, AfifDomainService::class.java).setAction(ACTION_VOICEMAIL_LIST)
+            )
+        }
+
+        fun requestVoicemailAudio(context: Context, id: Long) {
+            context.startService(
+                Intent(context, AfifDomainService::class.java)
+                    .setAction(ACTION_VOICEMAIL_AUDIO)
+                    .putExtra("id", id)
+            )
         }
 
         fun setMuted(context: Context, on: Boolean) {
@@ -120,6 +149,7 @@ class AfifDomainService : Service() {
     private var audioManager: AudioManager? = null
     private var recordId: String? = null
     private var callStartedAt = 0L
+    private var mediaPlayer: MediaPlayer? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -154,6 +184,14 @@ class AfifDomainService : Service() {
                 val to = intent.getStringExtra("to").orEmpty().trim()
                 val text = intent.getStringExtra("text").orEmpty()
                 if (to.isNotEmpty() && text.isNotEmpty()) sendSmsNow(to, text)
+            }
+            ACTION_VOICEMAIL_LIST -> {
+                voicemailError = ""
+                send(JSONObject().put("type", "voicemail-list"))
+            }
+            ACTION_VOICEMAIL_AUDIO -> {
+                val id = intent.getLongExtra("id", 0)
+                if (id > 0) send(JSONObject().put("type", "voicemail-audio").put("id", id))
             }
             ACTION_MUTE -> {
                 muted = intent.getBooleanExtra("on", false)
@@ -253,6 +291,33 @@ class AfifDomainService : Service() {
                     o.optString("id"),
                     if (o.optBoolean("ok")) "sent" else "failed"
                 )
+                "voicemails" -> {
+                    val arr = o.optJSONArray("items")
+                    val items = mutableListOf<AfifVoicemail>()
+                    if (arr != null) {
+                        for (i in 0 until arr.length()) {
+                            val v = arr.optJSONObject(i) ?: continue
+                            items.add(
+                                AfifVoicemail(
+                                    v.optLong("id"),
+                                    v.optString("from"),
+                                    v.optString("time"),
+                                    v.optInt("duration"),
+                                    v.optBoolean("heard")
+                                )
+                            )
+                        }
+                    }
+                    voicemails = items
+                }
+                "voicemail-audio" -> {
+                    val data = o.optString("data")
+                    if (data.isBlank()) {
+                        voicemailError = "Audio unavailable"
+                    } else {
+                        playVoicemail(o.optLong("id"), data)
+                    }
+                }
                 "pong" -> {}
             }
         } catch (_: Throwable) {
@@ -289,6 +354,24 @@ class AfifDomainService : Service() {
         try {
             (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).notify(1003, n)
         } catch (_: Throwable) { }
+    }
+
+    private fun playVoicemail(id: Long, base64: String) {
+        try {
+            mediaPlayer?.release()
+            mediaPlayer = null
+            val bytes = Base64.decode(base64, Base64.DEFAULT)
+            val file = File(cacheDir, "vm-$id.wav")
+            file.writeBytes(bytes)
+            mediaPlayer = MediaPlayer().apply {
+                setDataSource(file.absolutePath)
+                setOnCompletionListener { it.release(); mediaPlayer = null }
+                prepare()
+                start()
+            }
+        } catch (e: Throwable) {
+            voicemailError = "Playback: ${e.message}"
+        }
     }
 
     // ------------------------------------------------------------ calls
@@ -530,6 +613,8 @@ class AfifDomainService : Service() {
 
     override fun onDestroy() {
         running = false
+        try { mediaPlayer?.release() } catch (_: Throwable) { }
+        mediaPlayer = null
         cleanupCall()
         socket?.close(1000, "service stopped")
         socket = null

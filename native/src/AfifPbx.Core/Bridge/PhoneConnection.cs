@@ -146,6 +146,15 @@ public sealed class PhoneConnection
                         if (to.Length > 0 && text.Length > 0) _registry.RaiseSmsSend(Extension, to, text, id);
                         break;
                     }
+                case "voicemail-list":
+                    _registry.RaiseVoicemailList(Extension);
+                    break;
+                case "voicemail-audio":
+                    {
+                        long id = doc.RootElement.TryGetProperty("id", out var v) && v.TryGetInt64(out var n) ? n : 0;
+                        if (id > 0) _registry.RaiseVoicemailAudio(Extension, id);
+                        break;
+                    }
                 case "ping":
                     _ = SendControlAsync(new { type = "pong" });
                     break;

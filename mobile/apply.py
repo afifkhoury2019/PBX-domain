@@ -368,6 +368,7 @@ edit(manifest, "</application>",
      '    <activity android:name=".AfifDomainDialActivity" android:exported="false" android:label="AFIF Direct" />\n'
      '    <activity android:name=".AfifDomainMessagesActivity" android:exported="false" android:label="AFIF Direct Messages" />\n'
      '    <activity android:name=".AfifDomainThreadActivity" android:exported="false" android:label="AFIF Direct Thread" />\n'
+     '    <activity android:name=".AfifDomainVoicemailActivity" android:exported="false" android:label="AFIF Direct Voicemail" />\n'
      '    <activity android:name=".AfifDomainMainActivity" android:exported="true" android:label="AFIF Direct">\n'
      '        <intent-filter>\n'
      '            <action android:name="android.intent.action.MAIN" />\n'

@@ -38,6 +38,9 @@ public sealed class AudioBridgeServer
     /// <summary>A phone asked to send an SMS: extension, destination, text, client id.</summary>
     public event Action<string, string, string, string>? SmsSendRequested;
 
+    public event Action<string>? VoicemailListRequested;
+    public event Action<string, long>? VoicemailAudioRequested;
+
     public AudioBridgeServer(ConfigStore config)
     {
         _config = config;
@@ -51,6 +54,21 @@ public sealed class AudioBridgeServer
     {
         if (_phones.TryGetValue(extension, out var conn) && conn.IsOpen)
             conn.SendSmsResult(id, ok);
+    }
+
+    internal void RaiseVoicemailList(string extension) => VoicemailListRequested?.Invoke(extension);
+    internal void RaiseVoicemailAudio(string extension, long id) => VoicemailAudioRequested?.Invoke(extension, id);
+
+    public void SendVoicemailList(string extension, object items)
+    {
+        if (_phones.TryGetValue(extension, out var conn) && conn.IsOpen)
+            _ = conn.SendControlAsync(new { type = "voicemails", items });
+    }
+
+    public void SendVoicemailAudio(string extension, long id, string? data)
+    {
+        if (_phones.TryGetValue(extension, out var conn) && conn.IsOpen)
+            _ = conn.SendControlAsync(new { type = "voicemail-audio", id, data });
     }
 
     /// <summary>Deliver one SMS to a registered phone. False when that extension is offline.</summary>

@@ -249,6 +249,35 @@ public sealed class PbxEngine : IDisposable
             bool ok = await SendSmsAsync(CleanNumber(to), text, ext).ConfigureAwait(false);
             bridge.SendSmsResult(ext, id, ok);
         });
+        bridge.VoicemailListRequested += ext =>
+        {
+            var items = Db.Voicemails(ext).Select(v => new
+            {
+                id = v.Id,
+                from = v.Caller,
+                time = v.Time.ToString("O"),
+                duration = v.DurationSeconds,
+                heard = v.Heard
+            }).ToList();
+            bridge.SendVoicemailList(ext, items);
+        };
+        bridge.VoicemailAudioRequested += (ext, id) =>
+        {
+            var vm = Db.Voicemail(id);
+            if (vm is null || !string.Equals(vm.Mailbox, ext, StringComparison.OrdinalIgnoreCase))
+            {
+                bridge.SendVoicemailAudio(ext, id, null);
+                return;
+            }
+            try
+            {
+                var path = Path.Combine(DataDir, "Voicemail", vm.File);
+                var data = File.Exists(path) ? Convert.ToBase64String(File.ReadAllBytes(path)) : null;
+                Db.MarkVoicemailHeard(id);
+                bridge.SendVoicemailAudio(ext, id, data);
+            }
+            catch { bridge.SendVoicemailAudio(ext, id, null); }
+        };
     }
 
     /// <summary>Switch the direct WebSocket transport on/off from the dashboard.</summary>

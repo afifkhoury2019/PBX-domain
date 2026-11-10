@@ -59,6 +59,9 @@ class AfifDomainMainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
         }
         row2.addView(action("Theme") { chooseTheme() }, weight())
+        row2.addView(action("Voicemail") {
+            startActivity(android.content.Intent(this, AfifDomainVoicemailActivity::class.java))
+        }, weight())
         row2.addView(action("Info") { showInfo() }, weight())
 
         list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
