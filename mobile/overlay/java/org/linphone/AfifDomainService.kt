@@ -118,6 +118,8 @@ class AfifDomainService : Service() {
     private var audioThread: Thread? = null
     private var ringtone: Ringtone? = null
     private var audioManager: AudioManager? = null
+    private var recordId: String? = null
+    private var callStartedAt = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -297,6 +299,8 @@ class AfifDomainService : Service() {
         callNumber = number
         callName = name
         lastError = ""
+        callStartedAt = System.currentTimeMillis()
+        recordId = AfifCallStore.add(this, number, name, false, callStartedAt)
         ringtone = try {
             RingtoneManager.getRingtone(this, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE))
                 ?.also { it.play() }
@@ -339,6 +343,8 @@ class AfifDomainService : Service() {
         callNumber = number
         callName = ""
         lastError = ""
+        callStartedAt = System.currentTimeMillis()
+        recordId = AfifCallStore.add(this, number, "", true, callStartedAt)
         if (connected) {
             send(JSONObject().put("type", "dial").put("number", number))
         } else {
@@ -364,6 +370,7 @@ class AfifDomainService : Service() {
     private fun markAnswered() {
         if (!inCall) return
         answered = true
+        recordId?.let { AfifCallStore.markAnswered(this, it) }
         ringtone?.stop()
         ringtone = null
         startAudio()
@@ -392,6 +399,11 @@ class AfifDomainService : Service() {
         callId = ""
         callNumber = ""
         callName = ""
+        val duration = if (callStartedAt > 0)
+            ((System.currentTimeMillis() - callStartedAt) / 1000).toInt() else 0
+        recordId?.let { AfifCallStore.markEnded(this, it, duration) }
+        recordId = null
+        callStartedAt = 0L
         lastError = reasonOrEmpty()
         main.post {
             (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(1002)

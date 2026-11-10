@@ -357,7 +357,8 @@ edit(manifest,
      '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n'
      '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />\n'
      '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n'
-     '    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />')
+     '    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />\n'
+     '    <uses-permission android:name="android.permission.READ_CONTACTS" />')
 edit(manifest, "<application",
      '<application\n    android:usesCleartextTraffic="true"')
 edit(manifest, "</application>",
@@ -366,6 +367,12 @@ edit(manifest, "</application>",
      '    <activity android:name=".AfifDomainCallActivity" android:exported="false" android:showWhenLocked="true" android:turnScreenOn="true" android:excludeFromRecents="true" android:launchMode="singleTop" />\n'
      '    <activity android:name=".AfifDomainDialActivity" android:exported="false" android:label="AFIF Direct" />\n'
      '    <activity android:name=".AfifDomainMessagesActivity" android:exported="false" android:label="AFIF Direct Messages" />\n'
+     '    <activity android:name=".AfifDomainMainActivity" android:exported="true" android:label="AFIF Direct">\n'
+     '        <intent-filter>\n'
+     '            <action android:name="android.intent.action.MAIN" />\n'
+     '            <category android:name="android.intent.category.LAUNCHER" />\n'
+     '        </intent-filter>\n'
+     '    </activity>\n'
      '</application>')
 
 # Use the PBX address that matches the current network (Tailscale or LAN).
