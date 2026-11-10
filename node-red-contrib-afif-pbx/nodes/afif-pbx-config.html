@@ -1,0 +1,42 @@
+<script type="text/html" data-template-name="afif-pbx-config">
+  <div class="form-row">
+    <label for="node-config-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-config-input-name" placeholder="AFIF-PBX">
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-url"><i class="fa fa-link"></i> Panel URL</label>
+    <input type="text" id="node-config-input-url" placeholder="http://127.0.0.1:8090">
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-username"><i class="fa fa-user"></i> Username</label>
+    <input type="text" id="node-config-input-username" placeholder="admin">
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-password"><i class="fa fa-lock"></i> Password</label>
+    <input type="password" id="node-config-input-password" placeholder="panel password">
+  </div>
+</script>
+
+<script type="text/html" data-help-name="afif-pbx-config">
+  <p>Connection details for the AFIF-PBX panel. The nodes log in with the panel's admin
+  account and reuse the session cookie; the password is stored as a Node-RED credential.</p>
+  <p>The default panel URL on the Tinker Board is <code>http://127.0.0.1:8090</code>.</p>
+</script>
+
+<script type="text/javascript">
+  RED.nodes.registerType("afif-pbx-config", {
+    category: "config",
+    color: "#1a2648",
+    defaults: {
+      name: { value: "AFIF-PBX" },
+      url: { value: "http://127.0.0.1:8090" },
+      username: { value: "admin" }
+    },
+    credentials: {
+      password: { type: "password" }
+    },
+    label: function () {
+      return this.name || "AFIF-PBX";
+    }
+  });
+</script>

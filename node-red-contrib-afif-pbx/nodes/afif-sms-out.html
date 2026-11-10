@@ -1,0 +1,37 @@
+<script type="text/html" data-template-name="afif-sms-out">
+  <div class="form-row">
+    <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-input-name" placeholder="AFIF SMS out">
+  </div>
+  <div class="form-row">
+    <label for="node-input-config"><i class="fa fa-cog"></i> AFIF-PBX</label>
+    <input type="text" id="node-input-config">
+  </div>
+</script>
+
+<script type="text/html" data-help-name="afif-sms-out">
+  <p>Sends an SMS through the AFIF-PBX GSM line.</p>
+  <ul>
+    <li><code>msg.to</code> (or <code>msg.number</code> / <code>msg.topic</code>) — destination number.</li>
+    <li><code>msg.payload</code> — the message text.</li>
+  </ul>
+  <p>On success the input message continues with <code>msg.sent = true</code>; on failure
+  <code>msg.error</code> is set and the error is reported.</p>
+</script>
+
+<script type="text/javascript">
+  RED.nodes.registerType("afif-sms-out", {
+    category: "AFIF-PBX",
+    color: "#1a2648",
+    defaults: {
+      name: { value: "" },
+      config: { type: "afif-pbx-config", required: true }
+    },
+    inputs: 1,
+    outputs: 1,
+    icon: "font-awesome/fa-paper-plane",
+    label: function () {
+      return this.name || "AFIF SMS out";
+    }
+  });
+</script>

@@ -1,0 +1,27 @@
+name: Verify Linux scripts
+
+on:
+  push:
+    branches: [linux-port]
+    paths:
+      - "deploy/**"
+      - ".github/workflows/verify-installer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bash syntax
+        run: |
+          bash -n deploy/install.sh
+          bash -n deploy/uninstall.sh
+          bash -n deploy/migrate.sh
+      - name: ShellCheck (errors only)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck >/dev/null
+          shellcheck -S error deploy/install.sh deploy/uninstall.sh deploy/migrate.sh

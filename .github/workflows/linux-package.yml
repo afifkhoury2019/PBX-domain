@@ -1,0 +1,141 @@
+name: AFIF-PBX Linux package
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [linux-port]
+    paths:
+      - "native/**"
+      - "deploy/**"
+      - ".github/workflows/linux-package.yml"
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-arm
+            goarch: arm
+            goarm: "7"
+            name: armhf
+          - rid: linux-arm64
+            goarch: arm64
+            goarm: ""
+            name: arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.x"
+          check-latest: true
+          cache: false
+      - name: Build afif-net
+        working-directory: native/afif-net
+        env:
+          GOOS: linux
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+          CGO_ENABLED: "0"
+        run: |
+          go mod tidy
+          go build -trimpath -ldflags "-s -w" -o "$RUNNER_TEMP/afif-net" .
+          file "$RUNNER_TEMP/afif-net"
+      - name: Publish server
+        run: |
+          dotnet publish native/src/AfifPbx.Server/AfifPbx.Server.csproj \
+            -c Release -r ${{ matrix.rid }} --self-contained true \
+            -p:Version=2.0.0 -p:DebugType=none -o "out/${{ matrix.name }}"
+          cp "$RUNNER_TEMP/afif-net" "out/${{ matrix.name }}/afif-net"
+          chmod +x "out/${{ matrix.name }}/afif-net"
+          tar -C "out/${{ matrix.name }}" -czf "afif-pbx-linux-${{ matrix.name }}.tar.gz" .
+          ls -lh "afif-pbx-linux-${{ matrix.name }}.tar.gz"
+      - name: Publish package as a release asset
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="pbx-v2.0.${GITHUB_RUN_NUMBER}-${{ matrix.name }}"
+          FILE="afif-pbx-linux-${{ matrix.name }}.tar.gz"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$FILE" --clobber
+          else
+            gh release create "$TAG" "$FILE" \
+              --title "AFIF-PBX 2.0 ${{ matrix.name }} (bridge build)" \
+              --notes "Linux ${MATRIX_NAME} package with direct WebSocket audio bridge. Install via the board deployment procedure." \
+              --prerelease
+          fi
+        # Artifact storage quota may be exhausted; the release asset is the delivery path.
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: afif-pbx-linux-${{ matrix.name }}
+          path: afif-pbx-linux-${{ matrix.name }}.tar.gz
+
+  nodered:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Test and pack the Node-RED package
+        working-directory: node-red-contrib-afif-pbx
+        run: |
+          node --test test/client.test.js
+          npm pack
+          ls -lh ./*.tgz
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: node-red-contrib-afif-pbx
+          path: node-red-contrib-afif-pbx/*.tgz
+
+  smoke-arm64:
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - name: Download ARM64 package from the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "pbx-v2.0.${{ github.run_number }}-arm64" --pattern "afif-pbx-linux-arm64.tar.gz" --clobber
+      - name: Extract
+        run: |
+          mkdir -p pkg
+          tar -xzf afif-pbx-linux-arm64.tar.gz -C pkg
+          chmod +x pkg/AFIF-PBX-Service pkg/afif-net
+      - name: Run the ARM64 service under QEMU
+        run: |
+          docker run -d --name afif --platform linux/arm64 --network host \
+            -v "$PWD/pkg:/app" -w /app \
+            mcr.microsoft.com/dotnet/runtime:8.0 \
+            ./AFIF-PBX-Service --data /data
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8090/api/local/status -o status.json; then
+              echo "status:"; cat status.json; echo; break
+            fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:8090/ -o index.html || true
+          docker logs afif || true
+          test -s status.json
+          grep -q '"running":true' status.json
+          grep -qi 'AFIF-PBX' index.html
+      - name: Stop
+        if: always()
+        run: docker rm -f afif || true

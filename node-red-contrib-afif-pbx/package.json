@@ -1,0 +1,22 @@
+{
+  "name": "node-red-contrib-afif-pbx",
+  "version": "1.0.0",
+  "description": "AFIF-PBX nodes for Node-RED: SMS in/out, call events and PBX status from the AFIF-PBX panel.",
+  "keywords": ["node-red", "afif", "pbx", "sms", "asterisk", "gsm"],
+  "license": "MIT",
+  "node-red": {
+    "nodes": {
+      "afif-pbx-config": "nodes/afif-pbx-config.js",
+      "afif-sms-in": "nodes/afif-sms-in.js",
+      "afif-sms-out": "nodes/afif-sms-out.js",
+      "afif-call-events": "nodes/afif-call-events.js",
+      "afif-status": "nodes/afif-status.js"
+    }
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test test/"
+  }
+}

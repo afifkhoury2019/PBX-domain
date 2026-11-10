@@ -1,0 +1,19 @@
+[Unit]
+Description=AFIF-PBX phone system
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=afif-pbx
+Group=afif-pbx
+SupplementaryGroups=dialout audio
+WorkingDirectory=/opt/afif-pbx
+Environment=AFIF_PBX_DATA=/var/lib/afif-pbx
+ExecStart=/opt/afif-pbx/AFIF-PBX-Service --data /var/lib/afif-pbx
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

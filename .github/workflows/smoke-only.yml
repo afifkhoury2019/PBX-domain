@@ -1,0 +1,48 @@
+name: AFIF-PBX ARM64 smoke (existing artifact)
+
+on:
+  push:
+    branches: [linux-port]
+    paths:
+      - ".github/workflows/smoke-only.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - uses: actions/download-artifact@v4
+        with:
+          name: afif-pbx-linux-arm64
+          run-id: 40946816789
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run the ARM64 service under QEMU
+        run: |
+          mkdir -p pkg
+          tar -xzf afif-pbx-linux-arm64.tar.gz -C pkg
+          chmod +x pkg/AFIF-PBX-Service pkg/afif-net
+          docker run -d --name afif --platform linux/arm64 --network host \
+            -v "$PWD/pkg:/app" -w /app \
+            mcr.microsoft.com/dotnet/runtime:8.0 \
+            ./AFIF-PBX-Service --data /data
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8090/api/local/status -o status.json; then
+              echo "status:"; cat status.json; echo; break
+            fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:8090/ -o index.html || true
+          docker logs afif || true
+          test -s status.json
+          grep -q '"running":true' status.json
+          grep -qi 'AFIF-PBX' index.html
+      - name: Stop
+        if: always()
+        run: docker rm -f afif || true

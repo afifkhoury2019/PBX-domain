@@ -1,0 +1,202 @@
+name: AFIF Phone (Android)
+
+# Builds "AFIF Phone": Linphone (GPLv3) rebranded for AFIF-PBX, with the Tailscale engine
+# (BSD-3-Clause) built in, then starts it on an Android emulator and takes screenshots.
+on:
+  push:
+    branches: [main]
+    paths: ["mobile/**", ".github/workflows/mobile.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  VERSION_CODE: ${{ github.run_number }}
+  VERSION_NAME: 1.0.${{ github.run_number }}
+
+jobs:
+  build:
+    name: Build the APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: afif }
+
+      - name: Source versions
+        run: |
+          grep -v '^#' afif/mobile/pins.env >> "$GITHUB_ENV"
+          cat afif/mobile/pins.env
+
+      - name: Fetch Linphone and Tailscale sources
+        run: |
+          fetch() { git init -q "$1" && git -C "$1" remote add origin "$2" && git -C "$1" fetch -q --depth 1 origin "$3" && git -C "$1" checkout -q FETCH_HEAD; }
+          fetch linphone "$LINPHONE_REPO" "$LINPHONE_REF"
+          fetch tailscale "$TAILSCALE_REPO" "$TAILSCALE_REF"
+          # Tailscale's version stamp needs tags/history
+          git -C tailscale fetch -q --unshallow || true
+          git -C tailscale fetch -q --tags || true
+
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21" }
+
+      - name: Android NDK for the Tailscale engine
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;23.1.7779620" > /dev/null
+          ls "$ANDROID_HOME/ndk"
+
+      - name: Cache the Tailscale engine
+        id: tscache
+        uses: actions/cache@v4
+        with:
+          path: |
+            tailscale/android/libs/libtailscale.aar
+            tailscale/tailscale.version
+          key: libtailscale-${{ env.TAILSCALE_REF }}-v1
+
+      - name: Build the Tailscale engine (libtailscale.aar)
+        if: steps.tscache.outputs.cache-hit != 'true'
+        working-directory: tailscale
+        run: |
+          export NDK_ROOT="$ANDROID_HOME/ndk/23.1.7779620"
+          make tailscale.version
+          make libtailscale 2>&1 | tail -40
+          ls -la android/libs
+
+      - name: Put the engine where Gradle can find it
+        run: |
+          cat tailscale/tailscale.version
+          TS_VER=$(. tailscale/tailscale.version && echo "$VERSION_SHORT")
+          echo "TS_VER=$TS_VER" >> "$GITHUB_ENV"
+          d=linphone/localrepo/com/tailscale/libtailscale/$TS_VER
+          mkdir -p "$d"
+          cp tailscale/android/libs/libtailscale.aar "$d/libtailscale-$TS_VER.aar"
+          cat > "$d/libtailscale-$TS_VER.pom" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <project xmlns="http://maven.apache.org/POM/4.0.0">
+            <modelVersion>4.0.0</modelVersion>
+            <groupId>com.tailscale</groupId><artifactId>libtailscale</artifactId>
+            <version>$TS_VER</version><packaging>aar</packaging>
+          </project>
+          EOF
+          unzip -l "$d/libtailscale-$TS_VER.aar" | grep -E "\.so|classes.jar"
+
+      - name: Apply AFIF branding and the Tailscale module
+        run: python3 afif/mobile/apply.py --linphone linphone --tailscale tailscale
+
+      - name: Signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.AFIF_PHONE_KEYSTORE }}
+          KEY_PASSWORD: ${{ secrets.AFIF_PHONE_KEY_PASSWORD }}
+        run: |
+          cd linphone
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > app/afif-phone.jks
+            PW="$KEY_PASSWORD"
+            echo "Signing with the AFIF Phone release key"
+          else
+            PW=$(openssl rand -hex 16)
+            keytool -genkeypair -keystore app/afif-phone.jks -storepass "$PW" -keypass "$PW" -alias afif-phone \
+              -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=AFIF Phone, O=AFIF-TECH" > /dev/null
+            echo "::warning::No AFIF_PHONE_KEYSTORE secret - signed with a one-off key (updates will need uninstall first)"
+          fi
+          printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=afif-phone\nstoreFile=afif-phone.jks\n' "$PW" "$PW" > keystore.properties
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build AFIF Phone
+        working-directory: linphone
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace assembleRelease \
+            -PtailscaleVersion="$TS_VER" -PafifAppId="$APP_ID" \
+            -PafifVersionName="$VERSION_NAME" -PafifVersionCode="$VERSION_CODE" 2>&1 | tee ../build.log
+          cp app/build/outputs/apk/release/*.apk ../AFIF-Phone.apk
+          # an x86_64 build only for the emulator test
+          ./gradlew --no-daemon assembleRelease -PafifAbis=x86_64 \
+            -PtailscaleVersion="$TS_VER" -PafifAppId="$APP_ID" \
+            -PafifVersionName="$VERSION_NAME" -PafifVersionCode="$VERSION_CODE" 2>&1 | tail -5 | tee -a ../build.log
+          cp app/build/outputs/apk/release/*.apk ../AFIF-Phone-x86_64-test.apk
+
+      - name: Check the APK
+        run: |
+          AAPT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/aapt2
+          $AAPT dump badging AFIF-Phone.apk | grep -E "^package|application-label:|launchable-activity|native-code" | tee badging.txt
+          grep -q "name='$APP_ID'" badging.txt
+          grep -q "application-label:'$APP_NAME'" badging.txt
+          unzip -l AFIF-Phone.apk | grep -E "libgojni|liblinphone" | tee -a badging.txt
+
+      - name: Publish build log
+        if: always()
+        run: |
+          mkdir -p /tmp/ci && cp build.log badging.txt /tmp/ci/ 2>/dev/null || true
+          grep -nE "^e: |error:|FAILURE|What went wrong" -A6 build.log | head -200 > /tmp/ci/errors.txt 2>/dev/null || true
+          cd /tmp/ci && git init -q -b ci-phone && git add -A
+          git -c user.name=ci -c user.email=ci@localhost commit -q -m "phone build ${{ github.run_id }}"
+          git push -f -q "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-phone
+
+      # Actions artifact/log storage is a shared account-wide quota that keeps getting hit
+      # (independent of this repo's own usage, and slow to recalculate after cleanup), which
+      # was repeatedly blocking delivery even though the APK itself built fine. These two
+      # uploads are only for optional manual download / the emulator smoke test below, so a
+      # quota failure here must never fail the job or block the release step that follows.
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: AFIF-Phone
+          path: AFIF-Phone.apk
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: AFIF-Phone-x86_64-test
+          path: AFIF-Phone-x86_64-test.apk
+          retention-days: 1
+
+      # Publish straight from this job's own filesystem instead of round-tripping through
+      # Actions artifact storage (upload here, download in a separate "release" job) - a
+      # GitHub Release asset upload is a completely different quota from Actions artifact
+      # storage, so this keeps releases working even when that shared quota is hit.
+      - name: Publish AFIF Phone release
+        if: github.ref == 'refs/heads/linux-port'
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          cp AFIF-Phone.apk "AFIF-Phone-$VERSION_NAME.apk"
+          gh release create "phone-v$VERSION_NAME" "AFIF-Phone-$VERSION_NAME.apk" --repo "${{ github.repository }}" \
+            --title "AFIF Phone $VERSION_NAME (Android)" \
+            --notes "AFIF Phone for Android: SIP softphone for AFIF-PBX with a built-in secure network (Tailscale engine). Install the APK, open the menu > Secure network to sign in, then add your extension (server voip.powerchain.uk:5160, UDP). Based on Linphone (GPLv3) and tailscale-android (BSD-3); source and build scripts in /mobile."
+
+  emulator:
+    name: Run it on an Android emulator
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: afif }
+      - uses: actions/download-artifact@v4
+        with: { name: AFIF-Phone-x86_64-test }
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: bash afif/mobile/emulator-test.sh
+      - name: Publish screenshots
+        if: always()
+        run: |
+          cd shots 2>/dev/null || exit 0
+          git init -q -b ci-phone-run && git add -A
+          git -c user.name=ci -c user.email=ci@localhost commit -q -m "phone run ${{ github.run_id }}"
+          git push -f -q "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-phone-run
+      - name: Fail on crash
+        run: |
+          cat shots/pid.txt
+          if grep -qE "FATAL|ANR in" shots/crash.txt; then cat shots/crash.txt; exit 1; fi
+          ! grep -q "NOT RUNNING" shots/pid.txt

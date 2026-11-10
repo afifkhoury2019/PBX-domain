@@ -1,0 +1,10 @@
+# Huawei E303: switch the virtual CD-ROM (12d1:1f01) to modem mode.
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="12d1", ATTR{idProduct}=="1f01", RUN+="/usr/sbin/usb_modeswitch -v 12d1 -p 1f01 -M 55534243123456780000000000000011060000000000000000000000000000"
+
+# Stable names for the two E303 serial interfaces.
+# ttyUSB0 = AT / PC UI; ttyUSB1 = DIAG / voice (PCM after AT^DDSETEX=2).
+ACTION=="add", SUBSYSTEM=="tty", KERNEL=="ttyUSB2", ATTRS{idVendor}=="12d1", SYMLINK+="afif-gsm-at", GROUP="dialout", MODE="0660"
+ACTION=="add", SUBSYSTEM=="tty", KERNEL=="ttyUSB1", ATTRS{idVendor}=="12d1", SYMLINK+="afif-gsm-voice", GROUP="dialout", MODE="0660"
+
+# Make sure the option driver binds the modem ports after a mode switch.
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="12d1", RUN+="/sbin/modprobe option"
