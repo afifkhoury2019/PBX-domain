@@ -64,6 +64,9 @@ public sealed class PhoneConnection
         finally { _sendLock.Release(); }
     }
 
+    public void SendSms(string from, string text, DateTime time) =>
+        _ = SendControlAsync(new { type = "sms", from, text, time = time.ToString("O") });
+
     public async Task SendAudioAsync(byte[] frame)
     {
         await _sendLock.WaitAsync().ConfigureAwait(false);
@@ -130,6 +133,13 @@ public sealed class PhoneConnection
                         _activeLeg = leg;
                         leg.Ended += (_, _) => { if (ReferenceEquals(_activeLeg, leg)) _activeLeg = null; };
                         _registry.RaiseOutboundCallRequested(leg, number);
+                        break;
+                    }
+                case "sms":
+                    {
+                        var to = doc.RootElement.TryGetProperty("to", out var d) ? d.GetString() ?? "" : "";
+                        var text = doc.RootElement.TryGetProperty("text", out var x) ? x.GetString() ?? "" : "";
+                        if (to.Length > 0 && text.Length > 0) _registry.RaiseSmsSend(Extension, to, text);
                         break;
                     }
                 case "ping":

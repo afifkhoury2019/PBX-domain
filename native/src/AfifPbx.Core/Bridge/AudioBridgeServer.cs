@@ -32,12 +32,28 @@ public sealed class AudioBridgeServer
     /// by it. Carries the leg representing the phone and the number it asked to dial.</summary>
     public event Action<CallLeg, string>? IncomingCall;
 
+    /// <summary>A phone registered over the WebSocket; pending SMS can now be delivered.</summary>
+    public event Action<string>? PhoneRegistered;
+
+    /// <summary>A phone asked to send an SMS: extension, destination, text.</summary>
+    public event Action<string, string, string>? SmsSendRequested;
+
     public AudioBridgeServer(ConfigStore config)
     {
         _config = config;
     }
 
     internal void RaiseOutboundCallRequested(WsLeg leg, string dialed) => IncomingCall?.Invoke(leg, dialed);
+    internal void RaiseSmsSend(string extension, string to, string text) =>
+        SmsSendRequested?.Invoke(extension, to, text);
+
+    /// <summary>Deliver one SMS to a registered phone. False when that extension is offline.</summary>
+    public bool DeliverSms(string extension, string from, string text, DateTime time)
+    {
+        if (!_phones.TryGetValue(extension, out var conn) || !conn.IsOpen) return false;
+        conn.SendSms(from, text, time);
+        return true;
+    }
 
     /// <summary>True when the extension has a phone with an open, registered WebSocket - i.e. there is
     /// somewhere to ring it right now. Never touches the network; just a dictionary lookup.</summary>
@@ -79,6 +95,7 @@ public sealed class AudioBridgeServer
         var conn = new PhoneConnection(extension, socket, this);
         _phones[extension] = conn;
         Log.LogInformation("Phone registered for extension {Extension}", extension);
+        PhoneRegistered?.Invoke(extension);
         try
         {
             await conn.RunAsync().ConfigureAwait(false); // blocks for the life of the connection

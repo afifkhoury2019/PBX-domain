@@ -132,6 +132,7 @@ public sealed class PbxEngine : IDisposable
             AfifPbx.Bridge.PhoneConnection.Log = _logs.CreateLogger("Bridge");
             AfifPbx.Bridge.AudioBridgeServer.Log = _logs.CreateLogger("Bridge");
             Bridge = new AfifPbx.Bridge.AudioBridgeServer(Config);
+            WireBridge(Bridge);
         }
 
         Calls = new CallManager(Config, Sip, Dongles, Media, Db, Prompts, DataDir,
@@ -200,10 +201,16 @@ public sealed class PbxEngine : IDisposable
         {
             foreach (var (pid, target, sms) in Db.SmsPending(ext))
             {
-                if (!Sip.IsRegistered(target)) continue;
                 string text = sms.Text;
                 if (DateTime.UtcNow - sms.Time > TimeSpan.FromMinutes(5))
                     text += $"\n\n({sms.Time.ToLocalTime():yyyy-MM-dd HH:mm})"; // it waited for the phone: say when it really arrived
+                if (Bridge?.HasDevice(target) == true && Bridge.DeliverSms(target, sms.Number, text, sms.Time))
+                {
+                    Db.RemoveSmsPending(pid);
+                    Db.SetSmsStatus(sms.Id, "delivered");
+                    continue;
+                }
+                if (!Sip.IsRegistered(target)) continue;
                 if (await Sip.SendTextAsync(target, sms.Number, text).ConfigureAwait(false))
                 {
                     Db.RemoveSmsPending(pid);
@@ -234,6 +241,13 @@ public sealed class PbxEngine : IDisposable
         return ok;
     }
 
+    private void WireBridge(AfifPbx.Bridge.AudioBridgeServer bridge)
+    {
+        bridge.PhoneRegistered += ext => _ = DeliverPendingSmsAsync(ext);
+        bridge.SmsSendRequested += (ext, to, text) =>
+            _ = SendSmsAsync(CleanNumber(to), text, ext);
+    }
+
     /// <summary>Switch the direct WebSocket transport on/off from the dashboard.</summary>
     public void SetAudioBridgeEnabled(bool enabled)
     {
@@ -245,6 +259,7 @@ public sealed class PbxEngine : IDisposable
             AfifPbx.Bridge.PhoneConnection.Log = _logs.CreateLogger("Bridge");
             AfifPbx.Bridge.AudioBridgeServer.Log = _logs.CreateLogger("Bridge");
             Bridge = new AfifPbx.Bridge.AudioBridgeServer(Config);
+            WireBridge(Bridge);
             Calls.SetBridge(Bridge);
         }
         else
