@@ -12,10 +12,12 @@ import java.util.Date
 import java.util.Locale
 
 data class AfifSms(
+    val id: String,
     val address: String,
     val text: String,
     val time: Long,
-    val outgoing: Boolean
+    val outgoing: Boolean,
+    val status: String
 )
 
 object AfifSmsStore {
@@ -23,22 +25,27 @@ object AfifSmsStore {
     private const val KEY = "domain_sms"
     private const val MAX = 500
 
-    fun add(context: Context, address: String, text: String, time: Long, outgoing: Boolean) {
+    fun add(
+        context: Context,
+        address: String,
+        text: String,
+        time: Long,
+        outgoing: Boolean,
+        status: String = if (outgoing) "sending" else "received"
+    ): String {
+        val id = "$time-${(1000..9999).random()}"
         val list = all(context).toMutableList()
-        list.add(AfifSms(address, text, time, outgoing))
+        list.add(AfifSms(id, address, text, time, outgoing, status))
         while (list.size > MAX) list.removeAt(0)
-        val arr = JSONArray()
-        list.forEach {
-            arr.put(
-                JSONObject()
-                    .put("a", it.address)
-                    .put("t", it.text)
-                    .put("m", it.time)
-                    .put("o", it.outgoing)
-            )
-        }
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putString(KEY, arr.toString()).apply()
+        save(context, list)
+        return id
+    }
+
+    fun updateStatus(context: Context, id: String, status: String) {
+        val list = all(context).toMutableList()
+        val i = list.indexOfFirst { it.id == id }
+        if (i >= 0) list[i] = list[i].copy(status = status)
+        save(context, list)
     }
 
     fun all(context: Context): List<AfifSms> {
@@ -49,10 +56,12 @@ object AfifSmsStore {
             (0 until arr.length()).mapNotNull { i ->
                 val o = arr.optJSONObject(i) ?: return@mapNotNull null
                 AfifSms(
+                    o.optString("id"),
                     o.optString("a"),
                     o.optString("t"),
                     o.optLong("m"),
-                    o.optBoolean("o")
+                    o.optBoolean("o"),
+                    o.optString("s", "received")
                 )
             }
         } catch (_: Throwable) {
@@ -71,4 +80,21 @@ object AfifSmsStore {
 
     fun fmt(time: Long): String =
         SimpleDateFormat("dd MMM HH:mm", Locale.getDefault()).format(Date(time))
+
+    private fun save(context: Context, list: List<AfifSms>) {
+        val arr = JSONArray()
+        list.forEach {
+            arr.put(
+                JSONObject()
+                    .put("id", it.id)
+                    .put("a", it.address)
+                    .put("t", it.text)
+                    .put("m", it.time)
+                    .put("o", it.outgoing)
+                    .put("s", it.status)
+            )
+        }
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(KEY, arr.toString()).apply()
+    }
 }

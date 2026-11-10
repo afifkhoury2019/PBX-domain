@@ -92,7 +92,8 @@ class AfifDomainThreadActivity : Activity() {
         val pad = (8 * resources.displayMetrics.density).toInt()
         for (m in AfifSmsStore.thread(this, address)) {
             val row = TextView(this).apply {
-                text = "${if (m.outgoing) "→" else "←"} ${m.text}\n${AfifSmsStore.fmt(m.time)}"
+                text = "${if (m.outgoing) "→" else "←"} ${m.text}\n${AfifSmsStore.fmt(m.time)}" +
+                    if (m.outgoing) " · ${m.status}" else ""
                 textSize = 14f
                 setTextColor(Color.WHITE)
                 setPadding(pad, pad, pad, pad)

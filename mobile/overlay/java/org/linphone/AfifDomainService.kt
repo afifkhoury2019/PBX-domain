@@ -248,6 +248,11 @@ class AfifDomainService : Service() {
                 "answered" -> markAnswered()
                 "hangup" -> endCall(o.optString("reason", "remote hangup"))
                 "sms" -> incomingSms(o.optString("from"), o.optString("text"), o.optLong("time", System.currentTimeMillis()))
+                "sms-ack" -> AfifSmsStore.updateStatus(
+                    this,
+                    o.optString("id"),
+                    if (o.optBoolean("ok")) "sent" else "failed"
+                )
                 "pong" -> {}
             }
         } catch (_: Throwable) {
@@ -257,11 +262,12 @@ class AfifDomainService : Service() {
 
     private fun sendSmsNow(to: String, text: String) {
         val now = System.currentTimeMillis()
-        AfifSmsStore.add(this, to, text, now, true)
+        val id = AfifSmsStore.add(this, to, text, now, true)
         if (connected) {
-            send(JSONObject().put("type", "sms").put("to", to).put("text", text))
+            send(JSONObject().put("type", "sms").put("to", to).put("text", text).put("id", id))
         } else {
-            lastError = "Not connected — message stored, not sent"
+            AfifSmsStore.updateStatus(this, id, "failed")
+            lastError = "Not connected — message not sent"
         }
     }
 

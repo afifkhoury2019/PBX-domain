@@ -35,8 +35,8 @@ public sealed class AudioBridgeServer
     /// <summary>A phone registered over the WebSocket; pending SMS can now be delivered.</summary>
     public event Action<string>? PhoneRegistered;
 
-    /// <summary>A phone asked to send an SMS: extension, destination, text.</summary>
-    public event Action<string, string, string>? SmsSendRequested;
+    /// <summary>A phone asked to send an SMS: extension, destination, text, client id.</summary>
+    public event Action<string, string, string, string>? SmsSendRequested;
 
     public AudioBridgeServer(ConfigStore config)
     {
@@ -44,8 +44,14 @@ public sealed class AudioBridgeServer
     }
 
     internal void RaiseOutboundCallRequested(WsLeg leg, string dialed) => IncomingCall?.Invoke(leg, dialed);
-    internal void RaiseSmsSend(string extension, string to, string text) =>
-        SmsSendRequested?.Invoke(extension, to, text);
+    internal void RaiseSmsSend(string extension, string to, string text, string id) =>
+        SmsSendRequested?.Invoke(extension, to, text, id);
+
+    public void SendSmsResult(string extension, string id, bool ok)
+    {
+        if (_phones.TryGetValue(extension, out var conn) && conn.IsOpen)
+            conn.SendSmsResult(id, ok);
+    }
 
     /// <summary>Deliver one SMS to a registered phone. False when that extension is offline.</summary>
     public bool DeliverSms(string extension, string from, string text, DateTime time)

@@ -244,8 +244,11 @@ public sealed class PbxEngine : IDisposable
     private void WireBridge(AfifPbx.Bridge.AudioBridgeServer bridge)
     {
         bridge.PhoneRegistered += ext => _ = DeliverPendingSmsAsync(ext);
-        bridge.SmsSendRequested += (ext, to, text) =>
-            _ = SendSmsAsync(CleanNumber(to), text, ext);
+        bridge.SmsSendRequested += (ext, to, text, id) => _ = Task.Run(async () =>
+        {
+            bool ok = await SendSmsAsync(CleanNumber(to), text, ext).ConfigureAwait(false);
+            bridge.SendSmsResult(ext, id, ok);
+        });
     }
 
     /// <summary>Switch the direct WebSocket transport on/off from the dashboard.</summary>
