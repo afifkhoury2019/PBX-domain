@@ -11,10 +11,10 @@ namespace AfifPbx.Bridge;
 /// One phone's persistent WebSocket connection to the PBX - opened once when AFIF Phone starts (and kept open
 /// by its foreground service, reconnecting on drop) rather than once per call. A single socket carries both
 /// signaling (small JSON text frames: ring/answer/hangup/dial/ping) and, while a call is active, raw PCM audio
-/// (binary frames) - no Firebase, no FCM, no per-call socket. See docs/ARCHITECTURE.md.
+/// (binary frames) - no cloud push service, no per-call socket. See docs/ARCHITECTURE.md.
 ///
 /// This replaces the old per-call model where a fresh WebSocket opened for each call and a Firestore write
-/// woke the phone via FCM; here the phone is always reachable because it is always connected, exactly like a
+/// woke the phone via a push service; here the phone is always reachable because it is always connected, exactly like a
 /// SIP phone's persistent registration.
 /// </summary>
 public sealed class PhoneConnection

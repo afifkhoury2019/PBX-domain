@@ -11,7 +11,7 @@ namespace AfifPbx.Bridge;
 /// The phone-side counterpart to <see cref="AfifPbx.Sip.SipServer"/>: instead of SIP/RTP, AFIF Phone reaches
 /// the PBX over a plain, persistent WebSocket to this machine's own domain (e.g.
 /// wss://pbx.powerchain.uk/register/{extension}), riding the Cloudflare Tunnel that is already running - no
-/// VPN, no relay, no open port, and no third party (Firebase or otherwise) in between. The phone authenticates
+/// VPN, no relay, no open port, and no third party in between. The phone authenticates
 /// with the same extension/secret pair a SIP phone would use (see <see cref="PbxConfig"/>'s
 /// <see cref="Extension"/> list) and keeps the socket open for as long as the app runs, so the PBX can ring it
 /// at any time without needing a push notification to wake it up. See docs/ARCHITECTURE.md.

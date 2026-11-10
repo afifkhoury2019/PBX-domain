@@ -119,7 +119,7 @@ edit(gb, 'abiFilters += listOf("armeabi-v7a", "arm64-v8a")',
 edit(gb, "dependencies {", 'dependencies {\n    implementation(project(":tailscale"))', count=1)
 gs = os.path.join(APP, "google-services.json")
 if os.path.exists(gs):
-    os.remove(gs)  # Linphone's Firebase project only works for the official app
+    os.remove(gs)  # Linphone cloud config only works for the official app
     print("  removed google-services.json (no Linphone push/crash reporting)")
 
 print("== Application class")
