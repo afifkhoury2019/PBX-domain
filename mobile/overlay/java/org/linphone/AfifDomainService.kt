@@ -25,7 +25,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import okhttp3.ByteString
+import okio.ByteString
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
