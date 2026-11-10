@@ -365,6 +365,7 @@ edit(manifest, "</application>",
      '    <service android:name=".AfifDomainService" android:exported="false" android:foregroundServiceType="microphone" />\n'
      '    <activity android:name=".AfifDomainCallActivity" android:exported="false" android:showWhenLocked="true" android:turnScreenOn="true" android:excludeFromRecents="true" android:launchMode="singleTop" />\n'
      '    <activity android:name=".AfifDomainDialActivity" android:exported="false" android:label="AFIF Direct" />\n'
+     '    <activity android:name=".AfifDomainMessagesActivity" android:exported="false" android:label="AFIF Direct Messages" />\n'
      '</application>')
 
 # Use the PBX address that matches the current network (Tailscale or LAN).

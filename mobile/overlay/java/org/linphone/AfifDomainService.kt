@@ -41,6 +41,7 @@ class AfifDomainService : Service() {
         const val ACTION_ANSWER = "org.linphone.AFIF_DOMAIN_ANSWER"
         const val ACTION_HANGUP = "org.linphone.AFIF_DOMAIN_HANGUP"
         const val ACTION_DIAL = "org.linphone.AFIF_DOMAIN_DIAL"
+        const val ACTION_SMS = "org.linphone.AFIF_DOMAIN_SMS"
         const val ACTION_MUTE = "org.linphone.AFIF_DOMAIN_MUTE"
         const val ACTION_SPEAKER = "org.linphone.AFIF_DOMAIN_SPEAKER"
 
@@ -76,6 +77,14 @@ class AfifDomainService : Service() {
             val i = Intent(context, AfifDomainService::class.java)
                 .setAction(ACTION_DIAL)
                 .putExtra("number", number)
+            if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(i) else context.startService(i)
+        }
+
+        fun sendSms(context: Context, to: String, text: String) {
+            val i = Intent(context, AfifDomainService::class.java)
+                .setAction(ACTION_SMS)
+                .putExtra("to", to)
+                .putExtra("text", text)
             if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(i) else context.startService(i)
         }
 
@@ -138,6 +147,11 @@ class AfifDomainService : Service() {
             ACTION_DIAL -> {
                 val number = intent.getStringExtra("number").orEmpty().trim()
                 if (number.isNotEmpty()) dial(number)
+            }
+            ACTION_SMS -> {
+                val to = intent.getStringExtra("to").orEmpty().trim()
+                val text = intent.getStringExtra("text").orEmpty()
+                if (to.isNotEmpty() && text.isNotEmpty()) sendSmsNow(to, text)
             }
             ACTION_MUTE -> {
                 muted = intent.getBooleanExtra("on", false)
@@ -231,11 +245,42 @@ class AfifDomainService : Service() {
                 )
                 "answered" -> markAnswered()
                 "hangup" -> endCall(o.optString("reason", "remote hangup"))
+                "sms" -> incomingSms(o.optString("from"), o.optString("text"), o.optLong("time", System.currentTimeMillis()))
                 "pong" -> {}
             }
         } catch (_: Throwable) {
             // Ignore malformed control frames.
         }
+    }
+
+    private fun sendSmsNow(to: String, text: String) {
+        val now = System.currentTimeMillis()
+        AfifSmsStore.add(this, to, text, now, true)
+        if (connected) {
+            send(JSONObject().put("type", "sms").put("to", to).put("text", text))
+        } else {
+            lastError = "Not connected — message stored, not sent"
+        }
+    }
+
+    private fun incomingSms(from: String, text: String, time: Long) {
+        AfifSmsStore.add(this, from, text, time, false)
+        val open = Intent(this, AfifDomainMessagesActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        val pi = PendingIntent.getActivity(
+            this, 1003, open,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val n = notificationBuilder()
+            .setSmallIcon(android.R.drawable.ic_dialog_email)
+            .setContentTitle("SMS from $from")
+            .setContentText(text)
+            .setAutoCancel(true)
+            .setContentIntent(pi)
+            .build()
+        try {
+            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).notify(1003, n)
+        } catch (_: Throwable) { }
     }
 
     // ------------------------------------------------------------ calls

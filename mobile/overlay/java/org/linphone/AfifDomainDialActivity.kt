@@ -62,6 +62,14 @@ class AfifDomainDialActivity : Activity() {
                 AfifTransport.configure(this@AfifDomainDialActivity) { refreshInfo() }
             }
         }
+        val messages = Button(this).apply {
+            text = "Messages"
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.rgb(30, 41, 59))
+            setOnClickListener {
+                startActivity(android.content.Intent(this@AfifDomainDialActivity, AfifDomainMessagesActivity::class.java))
+            }
+        }
         val close = Button(this).apply {
             text = "Close"
             setTextColor(Color.WHITE)
@@ -76,6 +84,7 @@ class AfifDomainDialActivity : Activity() {
         root.addView(info)
         root.addView(number, lp)
         root.addView(call, lp)
+        root.addView(messages, lp)
         root.addView(config, lp)
         root.addView(close, lp)
         setContentView(root)
