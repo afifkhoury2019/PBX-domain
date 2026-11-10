@@ -42,6 +42,7 @@ public sealed class AudioBridgeServer
     /// <summary>True when the extension has a phone with an open, registered WebSocket - i.e. there is
     /// somewhere to ring it right now. Never touches the network; just a dictionary lookup.</summary>
     public bool HasDevice(string extension) => _phones.TryGetValue(extension, out var conn) && conn.IsOpen;
+    public int ConnectedCount => _phones.Values.Count(c => c.IsOpen);
 
     /// <summary>Ring an extension's phone over the audio bridge. Mirrors <c>SipServer.Ring</c>: returns
     /// immediately with a leg per device the extension owns (today, at most one), already in
@@ -87,6 +88,16 @@ public sealed class AudioBridgeServer
             _phones.TryRemove(new KeyValuePair<string, PhoneConnection>(extension, conn));
             Log.LogInformation("Phone disconnected for extension {Extension}", extension);
         }
+    }
+
+    /// <summary>Close every phone socket, e.g. when the domain transport is switched off.</summary>
+    public void CloseAll()
+    {
+        foreach (var conn in _phones.Values.ToList())
+        {
+            try { conn.Close("domain transport disabled"); } catch { }
+        }
+        _phones.Clear();
     }
 
     private static async Task CloseAsync(WebSocket socket, WebSocketCloseStatus status, string reason)

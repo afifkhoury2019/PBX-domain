@@ -33,7 +33,7 @@ public sealed class CallManager
 {
     private readonly ConfigStore _config;
     private readonly SipServer _sip;
-    private readonly AfifPbx.Bridge.AudioBridgeServer? _bridge;
+    private AfifPbx.Bridge.AudioBridgeServer? _bridge;
     private readonly List<DongleRuntime> _dongles;
     private readonly HuaweiModem? _modem;
     private readonly MediaOps _media;
@@ -63,6 +63,14 @@ public sealed class CallManager
         _sip.IncomingCall += (leg, dialed) => _ = HandleCallAsync(leg, dialed, null);
         if (_bridge is not null) _bridge.IncomingCall += (leg, dialed) => _ = HandleCallAsync(leg, dialed, null);
         foreach (var d in _dongles) WireDongle(d);
+    }
+
+    /// <summary>Switch the direct WebSocket transport on/off without restarting the PBX.</summary>
+    public void SetBridge(AfifPbx.Bridge.AudioBridgeServer? bridge)
+    {
+        _bridge = bridge;
+        if (bridge is not null)
+            bridge.IncomingCall += (leg, dialed) => _ = HandleCallAsync(leg, dialed, null);
     }
 
     /// <summary>Add a newly hot-plugged dongle without restarting the PBX.</summary>

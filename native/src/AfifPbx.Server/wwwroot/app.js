@@ -175,7 +175,7 @@ window.copyText = copy;
 pages.dashboard = {
   title: "Dashboard", refresh: 3000,
   async render() {
-    const s = await api("/status");
+    const [s, t] = await Promise.all([api("/status"), api("/transports")]);
     state.status = s;
     $("#vmBadge").textContent = s.newVoicemails || "";
     $("#topStatus").innerHTML = `<span><span class="dot ${s.modem?.state === "ready" ? "on" : "warn"}"></span>GSM ${esc(s.modem?.operator || s.modem?.state || "off")}</span>
@@ -198,6 +198,17 @@ pages.dashboard = {
           <div class="row" style="margin-top:8px">${s.extensions.map(e => `<span class="pill ${e.registered ? "good" : ""}" title="${esc(e.name)}">${esc(e.number)}</span>`).join("")}</div></div>
         <div class="card"><h3>Messages</h3><div class="stat">${s.newVoicemails}</div><div class="sub">new voicemail${s.newVoicemails === 1 ? "" : "s"}</div>
           <div class="sub" style="margin-top:6px">${s.recentSms.length ? "Latest SMS: " + esc(s.recentSms[0].number) : "No SMS yet"}</div></div>
+        <div class="card"><h3>Transports</h3>
+          <label class="transport-row">
+            <input type="checkbox" data-transport="tailscale" ${t.tailscale.enabled ? "checked" : ""}>
+            <span><b>Tailscale</b><span class="sub">SIP/Tailnet · ${t.tailscale.enabled ? (t.tailscale.running ? "connected" : "starting") : "off"}</span></span>
+          </label>
+          <label class="transport-row">
+            <input type="checkbox" data-transport="domain" ${t.domain.enabled ? "checked" : ""}>
+            <span><b>Domain</b><span class="sub">Direct WSS · ${t.domain.enabled ? t.domain.connectedPhones + " phone(s)" : "off"}</span></span>
+          </label>
+          <div class="sub" style="margin-top:8px">Turn one or both off. Tailscale off stops remote SIP; Domain off stops the public WebSocket.</div>
+        </div>
         <div class="card wide"><h3>Calls in progress</h3>
           ${s.activeCalls.length ? `<div class="table-wrap"><table><tr><th>From</th><th>To</th><th>Status</th><th>Since</th><th></th></tr>
             ${s.activeCalls.map(c => `<tr><td>${esc(c.fromName && c.fromName !== c.from ? c.fromName + " · " : "")}${esc(c.from)}</td><td>${esc(c.to)}${c.connectedTo ? " → " + esc(c.connectedTo) : ""}</td>
@@ -209,6 +220,12 @@ pages.dashboard = {
         <div class="card wide"><h3>Recent calls</h3>${callTable(s.recentCalls)}</div>
       </div>`;
     $$("[data-hangup]").forEach(b => b.addEventListener("click", run(async () => { await api(`/calls/${b.dataset.hangup}/hangup`, { method: "POST" }); toast("Call ended"); })));
+    $$("[data-transport]").forEach(input => input.addEventListener("change", run(async () => {
+      const name = input.dataset.transport;
+      await api("/transports", { method: "POST", body: { [name]: input.checked } });
+      toast(name === "tailscale" ? (input.checked ? "Tailscale on" : "Tailscale off") : (input.checked ? "Domain on" : "Domain off"));
+      route();
+    })));
   }
 };
 

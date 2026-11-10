@@ -604,6 +604,37 @@ api.MapPost("/tailscale/domain", async (TailscaleDomainRequest req) =>
 });
 api.MapDelete("/tailscale/domain", () => { tailscale.ClearDomain(); return Results.Ok(); });
 
+// ---------------------------------------------------------------- transports
+api.MapGet("/transports", () => new
+{
+    tailscale = new
+    {
+        enabled = tailscale.Config.Enabled,
+        running = tailscale.EngineRunning
+    },
+    domain = new
+    {
+        enabled = engine.Bridge is not null,
+        connectedPhones = engine.Bridge?.ConnectedCount ?? 0,
+        publicHost = engine.Config.Current.Settings.PublicHost
+    }
+});
+api.MapPost("/transports", (TransportRequest req) =>
+{
+    if (req.Tailscale is bool ts)
+    {
+        var (ok, message) = tailscale.SetEnabled(ts);
+        if (!ok) return Results.Json(new { error = message }, statusCode: 400);
+    }
+    if (req.Domain is bool domain)
+        engine.SetAudioBridgeEnabled(domain);
+    return Results.Ok(new
+    {
+        tailscale = new { enabled = tailscale.Config.Enabled, running = tailscale.EngineRunning },
+        domain = new { enabled = engine.Bridge is not null, connectedPhones = engine.Bridge?.ConnectedCount ?? 0 }
+    });
+});
+
 // ---------------------------------------------------------------- Telegram
 api.MapGet("/telegram", () => telegram.Status());
 api.MapPost("/telegram", (TelegramRequest req) =>
@@ -699,6 +730,7 @@ record SpeechRequest(string? Text);
 record TelegramRequest(bool Enabled, string? Token, string? ChatIds, bool? ForwardSms, bool? ForwardMissedCalls);
 record TailscaleConnectRequest(string? AuthKey, string? Hostname);
 record TailscaleDomainRequest(string? Domain, string? ApiToken);
+record TransportRequest(bool? Tailscale, bool? Domain);
 
 /// <summary>
 /// Keeps the Windows Firewall rules for AFIF-PBX right: phones on the local network may reach SIP, RTP and the

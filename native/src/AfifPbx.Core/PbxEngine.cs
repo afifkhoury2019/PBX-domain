@@ -234,6 +234,28 @@ public sealed class PbxEngine : IDisposable
         return ok;
     }
 
+    /// <summary>Switch the direct WebSocket transport on/off from the dashboard.</summary>
+    public void SetAudioBridgeEnabled(bool enabled)
+    {
+        Config.Update(c => c.Settings.AudioBridgeEnabled = enabled);
+        if (enabled)
+        {
+            if (Bridge is not null) return;
+            AfifPbx.Bridge.WsLeg.Log = _logs.CreateLogger("Bridge");
+            AfifPbx.Bridge.PhoneConnection.Log = _logs.CreateLogger("Bridge");
+            AfifPbx.Bridge.AudioBridgeServer.Log = _logs.CreateLogger("Bridge");
+            Bridge = new AfifPbx.Bridge.AudioBridgeServer(Config);
+            Calls.SetBridge(Bridge);
+        }
+        else
+        {
+            var old = Bridge;
+            Bridge = null;
+            Calls.SetBridge(null);
+            old?.CloseAll();
+        }
+    }
+
     private async Task RescanDonglesAsync()
     {
         try

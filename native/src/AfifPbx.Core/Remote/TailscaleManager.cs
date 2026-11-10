@@ -126,7 +126,7 @@ public sealed class TailscaleManager : IDisposable
 
     // ------------------------------------------------------------------ engine process
 
-    private bool EngineRunning { get { lock (_lock) return _proc is { HasExited: false } && _control.Length > 0; } }
+    public bool EngineRunning { get { lock (_lock) return _proc is { HasExited: false } && _control.Length > 0; } }
 
     private void StartEngine()
     {
@@ -348,6 +348,21 @@ public sealed class TailscaleManager : IDisposable
             await Task.Delay(500).ConfigureAwait(false);
         }
         return (false, "The secure network did not answer in time. Check the internet connection of this PC.", "");
+    }
+
+    /// <summary>Switch the secure network engine on/off without discarding its login state.</summary>
+    public (bool Ok, string Message) SetEnabled(bool enabled)
+    {
+        lock (_lock) _cfg.Enabled = enabled;
+        Save();
+        if (enabled)
+        {
+            _nextStart = DateTime.MinValue;
+            StartEngine();
+            return (true, "Secure network starting.");
+        }
+        StopEngine();
+        return (true, "Secure network switched off.");
     }
 
     /// <summary>Sign out and switch the secure network off.</summary>
