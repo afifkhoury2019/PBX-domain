@@ -81,6 +81,7 @@ class AfifDomainMessagesActivity : Activity() {
         root.addView(send)
         root.addView(back)
         setContentView(root)
+        AfifTheme.applyChat(root)
         tick.post(refresh)
     }
 
@@ -108,6 +109,7 @@ class AfifDomainMessagesActivity : Activity() {
                     if (m.outgoing) Color.rgb(16, 70, 60) else Color.rgb(30, 41, 59)
                 )
             }
+            AfifTheme.applyBubble(row, m.outgoing)
             list.addView(row, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT

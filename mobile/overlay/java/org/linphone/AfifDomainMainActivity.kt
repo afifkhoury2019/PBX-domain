@@ -54,6 +54,7 @@ class AfifDomainMainActivity : Activity() {
         row.addView(action("Connection") {
             AfifTransport.configure(this) { refresh() }
         }, weight())
+        row.addView(action("Theme") { chooseTheme() }, weight())
 
         list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val scroll = ScrollView(this).apply { addView(list) }
@@ -152,6 +153,20 @@ class AfifDomainMainActivity : Activity() {
             })
             setOnClickListener { click() }
         }
+    }
+
+    private fun chooseTheme() {
+        val labels = AfifTheme.labels()
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Call and message theme")
+            .setSingleChoiceItems(labels, AfifTheme.index(this)) { d, which ->
+                AfifTheme.setIndex(this, which)
+                AfifTheme.setMessageIndex(this, which)
+                d.dismiss()
+                refresh()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun call(number: String) {

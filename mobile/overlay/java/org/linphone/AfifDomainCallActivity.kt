@@ -36,6 +36,7 @@ class AfifDomainCallActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AfifTheme.applyCallWindow(this)
         window.addFlags(
             WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
@@ -43,7 +44,9 @@ class AfifDomainCallActivity : Activity() {
         )
         val number = intent.getStringExtra("number").orEmpty()
         val name = intent.getStringExtra("name").orEmpty()
-        setContentView(buildUi(if (name.isNotBlank()) name else number, number))
+        val root = buildUi(if (name.isNotBlank()) name else number, number)
+        setContentView(root)
+        AfifTheme.applyCall(this, root)
         render()
         tick.post(refresh)
     }
