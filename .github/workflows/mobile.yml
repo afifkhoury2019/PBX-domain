@@ -159,7 +159,7 @@ jobs:
       # GitHub Release asset upload is a completely different quota from Actions artifact
       # storage, so this keeps releases working even when that shared quota is hit.
       - name: Publish AFIF Phone release
-        if: github.ref == 'refs/heads/linux-port'
+        if: github.ref == 'refs/heads/main'
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
           cp AFIF-Phone.apk "AFIF-Phone-$VERSION_NAME.apk"

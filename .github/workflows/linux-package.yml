@@ -3,7 +3,7 @@ name: AFIF-PBX Linux package
 on:
   workflow_dispatch:
   push:
-    branches: [linux-port]
+    branches: [main]
     paths:
       - "native/**"
       - "deploy/**"

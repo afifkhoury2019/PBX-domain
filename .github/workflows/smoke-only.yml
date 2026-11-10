@@ -2,7 +2,7 @@ name: AFIF-PBX ARM64 smoke (existing artifact)
 
 on:
   push:
-    branches: [linux-port]
+    branches: [main]
     paths:
       - ".github/workflows/smoke-only.yml"
   workflow_dispatch:

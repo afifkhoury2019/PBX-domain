@@ -2,7 +2,7 @@ name: Verify Linux scripts
 
 on:
   push:
-    branches: [linux-port]
+    branches: [main]
     paths:
       - "deploy/**"
       - ".github/workflows/verify-installer.yml"

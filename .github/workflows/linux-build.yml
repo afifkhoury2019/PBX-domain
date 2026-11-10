@@ -3,7 +3,7 @@ name: AFIF-PBX Linux build (compile check)
 on:
   workflow_dispatch:
   push:
-    branches: [linux-port]
+    branches: [main]
     paths:
       - "native/src/**"
       - "native/tests/**"
