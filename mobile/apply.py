@@ -363,6 +363,9 @@ edit(manifest, "<application",
      '<application\n    android:usesCleartextTraffic="true"')
 edit(manifest, "</application>",
      '    <receiver android:name="org.linphone.AfifWatchdogReceiver" android:exported="false" />\n'
+     '    <receiver android:name="org.linphone.AfifDomainBootReceiver" android:exported="false">\n'
+     '        <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter>\n'
+     '    </receiver>\n'
      '    <service android:name=".AfifDomainService" android:exported="false" android:foregroundServiceType="microphone" />\n'
      '    <activity android:name=".AfifDomainCallActivity" android:exported="false" android:showWhenLocked="true" android:turnScreenOn="true" android:excludeFromRecents="true" android:launchMode="singleTop" />\n'
      '    <activity android:name=".AfifDomainDialActivity" android:exported="false" android:label="AFIF Direct" />\n'
