@@ -69,17 +69,23 @@ object AfifTransport {
     fun setMode(context: Context, mode: Int) {
         prefs(context).edit().putInt(MODE, mode).apply()
         if (mode == DOMAIN) {
-            AfifDomainService.start(context)
-            Toast.makeText(context, "Domain mode: no VPN needed", Toast.LENGTH_SHORT).show()
+            AfifDomainService.stop(context)
+            AfifSipBridgeService.start(context)
+            AfifLocalSip.configure(context)
+            Toast.makeText(context, "Domain mode: local SIP bridge", Toast.LENGTH_SHORT).show()
         } else {
             AfifDomainService.stop(context)
+            AfifSipBridgeService.stop(context)
             Toast.makeText(context, "Tailscale mode: SIP over the secure network", Toast.LENGTH_SHORT).show()
         }
     }
 
     /** Start the direct service after a reboot/launch when Domain is already selected. */
     fun bootstrap(context: Context) {
-        if (isDomain(context) && secret(context).isNotEmpty()) AfifDomainService.start(context)
+        if (isDomain(context) && secret(context).isNotEmpty()) {
+            AfifSipBridgeService.start(context)
+            AfifLocalSip.configure(context)
+        }
     }
 
     /** Dialog for the public host, extension, and SIP secret used by the WebSocket. */

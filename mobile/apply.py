@@ -356,6 +356,7 @@ edit(manifest,
      '    <uses-permission android:name="android.permission.WAKE_LOCK" />\n'
      '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n'
      '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />\n'
+     '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />\n'
      '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n'
      '    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />\n'
      '    <uses-permission android:name="android.permission.READ_CONTACTS" />')
@@ -367,17 +368,13 @@ edit(manifest, "</application>",
      '        <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter>\n'
      '    </receiver>\n'
      '    <service android:name=".AfifDomainService" android:exported="false" android:foregroundServiceType="microphone" />\n'
+     '    <service android:name=".AfifSipBridgeService" android:exported="false" android:foregroundServiceType="dataSync" />\n'
      '    <activity android:name=".AfifDomainCallActivity" android:exported="false" android:showWhenLocked="true" android:turnScreenOn="true" android:excludeFromRecents="true" android:launchMode="singleTop" />\n'
      '    <activity android:name=".AfifDomainDialActivity" android:exported="false" android:label="AFIF Direct" />\n'
      '    <activity android:name=".AfifDomainMessagesActivity" android:exported="false" android:label="AFIF Direct Messages" />\n'
      '    <activity android:name=".AfifDomainThreadActivity" android:exported="false" android:label="AFIF Direct Thread" />\n'
      '    <activity android:name=".AfifDomainVoicemailActivity" android:exported="false" android:label="AFIF Direct Voicemail" />\n'
-     '    <activity android:name=".AfifDomainMainActivity" android:exported="true" android:label="AFIF Direct">\n'
-     '        <intent-filter>\n'
-     '            <action android:name="android.intent.action.MAIN" />\n'
-     '            <category android:name="android.intent.category.LAUNCHER" />\n'
-     '        </intent-filter>\n'
-     '    </activity>\n'
+     '    <activity android:name=".AfifDomainMainActivity" android:exported="false" android:label="AFIF Direct" />\n'
      '</application>')
 
 # Use the PBX address that matches the current network (Tailscale or LAN).
