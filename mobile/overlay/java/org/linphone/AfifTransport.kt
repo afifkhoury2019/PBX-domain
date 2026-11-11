@@ -26,7 +26,7 @@ object AfifTransport {
     fun labels(): Array<String> = arrayOf("Tailscale (SIP)", "Domain (no VPN)")
 
     fun index(context: Context): Int {
-        val mode = prefs(context).getInt(MODE, TAILSCALE)
+        val mode = prefs(context).getInt(MODE, DOMAIN)
         return if (mode == DOMAIN) 1 else 0
     }
 
@@ -48,6 +48,15 @@ object AfifTransport {
 
     fun secret(context: Context): String =
         prefs(context).getString(SECRET, "").orEmpty().trim()
+
+    /** Credentials entered in the third-party setup; host is always the AFIF domain. */
+    fun saveCredentials(context: Context, extension: String, secret: String) {
+        prefs(context).edit()
+            .putString(HOST, "pbx.powerchain.uk")
+            .putString(EXT, extension.trim())
+            .putString(SECRET, secret.trim())
+            .apply()
+    }
 
     /**
      * Called from the settings spinner. Selecting Domain asks for the PBX

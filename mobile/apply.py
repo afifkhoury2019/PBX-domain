@@ -239,8 +239,45 @@ if os.path.exists(login600):
         t = t[:j] + 'app:layout_constraintTop_toBottomOf="@id/afif_secure_network"' + t[j + len('app:layout_constraintTop_toBottomOf="@id/outbound_proxy"'):]
         write(login600, t)
         print("  tablet login layout: option added")
+# A visible connection choice in the third-party setup, so WebSocket is not hidden
+# behind the separate Connection settings screen.
+AFIF_WS_CHECKBOX = (
+    '                <CheckBox\n'
+    '                    android:id="@+id/afif_websocket"\n'
+    '                    android:layout_width="0dp"\n'
+    '                    android:layout_height="wrap_content"\n'
+    '                    android:layout_marginStart="16dp"\n'
+    '                    android:layout_marginEnd="16dp"\n'
+    '                    android:layout_marginTop="8dp"\n'
+    '                    android:text="Connect through AFIF WebSocket (no VPN)"\n'
+    '                    android:checked="true"\n'
+    '                    app:layout_constraintTop_toBottomOf="@id/domain"\n'
+    '                    app:layout_constraintStart_toStartOf="parent"\n'
+    '                    app:layout_constraintEnd_toEndOf="parent" />\n\n'
+)
+for path in [login, login600]:
+    if not os.path.exists(path):
+        continue
+    s = read(path)
+    anchor = ('                <androidx.appcompat.widget.AppCompatTextView\n'
+              '                    style="@style/header_style"\n'
+              '                    android:id="@+id/display_name_label"')
+    if anchor in s and 'android:id="@+id/afif_websocket"' not in s:
+        s = s.replace(anchor, AFIF_WS_CHECKBOX + anchor, 1)
+        di = s.index('android:id="@+id/display_name_label"')
+        ti = s.index('app:layout_constraintTop_toBottomOf="@id/domain"', di)
+        s = s[:ti] + 'app:layout_constraintTop_toBottomOf="@id/afif_websocket"' + s[ti + len('app:layout_constraintTop_toBottomOf="@id/domain"'):]
+        write(path, s)
+        print(f"  websocket choice added to {os.path.basename(path)}")
+
 lf = os.path.join(MAIN, "java", "org", "linphone", "ui", "assistant", "fragment", "ThirdPartySipAccountLoginFragment.kt")
-edit(lf, "        binding.viewModel = viewModel\n", "        binding.viewModel = viewModel\n        org.linphone.AfifSecureNetwork.bind(requireActivity(), binding.afifSecureNetwork)\n")
+edit(lf, "        binding.viewModel = viewModel\n", "        binding.viewModel = viewModel\n"
+     "        org.linphone.AfifSecureNetwork.bind(requireActivity(), binding.afifSecureNetwork)\n"
+     "        binding.afifWebsocket.isChecked = org.linphone.AfifTransport.isDomain(requireContext())\n"
+     "        binding.afifWebsocket.setOnCheckedChangeListener { _, checked ->\n"
+     "            org.linphone.AfifTransport.setMode(requireContext(),\n"
+     "                if (checked) org.linphone.AfifTransport.DOMAIN else org.linphone.AfifTransport.TAILSCALE)\n"
+     "        }\n")
 acc = os.path.join(MAIN, "res", "layout", "account_settings_fragment.xml")
 edit(acc, "                        app:layout_constraintTop_toBottomOf=\"@id/advanced_settings_header\"/>\n\n",
      "                        app:layout_constraintTop_toBottomOf=\"@id/advanced_settings_header\"/>\n\n" +
@@ -404,7 +441,20 @@ edit(tpvm, "    fun login() {",
      "        try { cm.unregisterNetworkCallback(networkCallback) } catch (_: Throwable) {}\n"
      "        super.onCleared()\n"
      "    }\n\n"
-     "    fun login() {")
+     "    fun login() {\n"
+     "        val afifWebSocket = org.linphone.AfifTransport.isDomain(coreContext.context)\n"
+     "        if (afifWebSocket) {\n"
+     "            org.linphone.AfifTransport.saveCredentials(\n"
+     "                coreContext.context,\n"
+     "                username.value.orEmpty(),\n"
+     "                password.value.orEmpty()\n"
+     "            )\n"
+     "            org.linphone.AfifSipBridgeService.start(coreContext.context)\n"
+     "        }")
+# Force the SIP identity to the local bridge when WebSocket mode is selected.
+edit(tpvm, "            val domainValue = domain.value.orEmpty().trim()",
+     "            val domainValue = if (org.linphone.AfifTransport.isDomain(coreContext.context))\n"
+     "                \"127.0.0.1:5070\" else domain.value.orEmpty().trim()")
 # This simplified login screen never shows the dial-plan/country picker that would
 # normally set internationalPrefix, so it was always empty - Linphone could never
 # turn a locally-dialled number like "0799031745" into "+962799031745" to match it
