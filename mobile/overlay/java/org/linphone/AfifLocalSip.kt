@@ -25,21 +25,25 @@ object AfifLocalSip {
                 val p = existing.params
                 p.identityAddress = identity
                 p.serverAddress = server
-                p.password = secret
                 p.transport = TransportType.Udp
                 p.isOutboundProxyEnabled = false
                 existing.params = p
+                core.addAuthInfo(
+                    Factory.instance().createAuthInfo(extension, null, secret, null, null, HOST)
+                )
                 existing.refreshRegister()
             } else {
                 val p = core.createAccountParams()
                 p.identityAddress = identity
                 p.serverAddress = server
-                p.password = secret
                 p.transport = TransportType.Udp
                 p.isOutboundProxyEnabled = false
                 val account = core.createAccount(p)
                 core.addAccount(account)
                 core.defaultAccount = account
+                core.addAuthInfo(
+                    Factory.instance().createAuthInfo(extension, null, secret, null, null, HOST)
+                )
                 core.refreshRegisters()
             }
         } catch (e: Throwable) {
