@@ -167,6 +167,15 @@ class AfifDomainService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_START) {
+            // Direct-service Domain mode is retired. Native Linphone uses the local SIP
+            // bridge; starting this legacy service too would create a second WebSocket
+            // registration for the same extension. It also used a microphone foreground
+            // service type, which crashed on Android 16 when RECORD_AUDIO was not granted.
+            AfifSipBridgeService.start(this)
+            stopSelf()
+            return START_NOT_STICKY
+        }
         when (intent?.action) {
             ACTION_START -> {
                 // Several screens (dial, messages, voicemail, thread, main) call start()
