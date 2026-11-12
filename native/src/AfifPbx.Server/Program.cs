@@ -293,7 +293,8 @@ object StatusDto() => new
     extensions = engine.Config.Current.Extensions.Select(e => new
     {
         e.Number, e.Name, e.Enabled,
-        registered = engine.Sip.IsRegistered(e.Number),
+        registered = engine.Sip.IsRegistered(e.Number) || engine.Bridge?.HasDevice(e.Number) == true,
+        webSocket = engine.Bridge?.HasDevice(e.Number) == true,
         devices = engine.Sip.Bindings(e.Number).Select(b => new { b.UserAgent, address = b.RemoteEndPoint.ToString(), expires = b.ExpiresUtc }),
     }),
     modem = engine.Modem?.Status,
@@ -317,7 +318,8 @@ app.MapGet("/api/local/status", () => new
     httpPort,
     sipPort = engine.Config.Current.Settings.SipPort,
     addresses = SipServer.LocalAddresses(),
-    registered = engine.Config.Current.Extensions.Count(e => engine.Sip.IsRegistered(e.Number)),
+    registered = engine.Config.Current.Extensions.Count(e =>
+        engine.Sip.IsRegistered(e.Number) || engine.Bridge?.HasDevice(e.Number) == true),
     extensions = engine.Config.Current.Extensions.Count,
     activeCalls = engine.Calls.ActiveCalls.Count,
     modem = engine.Modem?.Status,

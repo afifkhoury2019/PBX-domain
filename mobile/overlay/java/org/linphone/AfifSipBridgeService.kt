@@ -255,6 +255,13 @@ class AfifSipBridgeService : Service() {
             if (sdp != null) startRtp(d, sdp)
             sendAck(d, msg.first("Contact"))
             send(JSONObject().put("type", "answer"))
+        } else if (code >= 300 && d.incoming && !d.answered) {
+            d.remoteTag = tagOf(msg.first("To"))
+            dialogs.remove(id)
+            d.rtp?.close()
+            sendAck(d, msg.first("Contact"))
+            send(JSONObject().put("type", "hangup"))
+            Log.i("AFIF-BRIDGE", "incoming declined by Linphone: $code")
         }
     }
 

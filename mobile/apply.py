@@ -415,7 +415,7 @@ edit(manifest, "</application>",
      '    <receiver android:name="org.linphone.AfifDomainBootReceiver" android:exported="false">\n'
      '        <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter>\n'
      '    </receiver>\n'
-     '    <service android:name=".AfifDomainService" android:exported="false" android:foregroundServiceType="microphone" />\n'
+     '    <service android:name=".AfifDomainService" android:exported="false" android:foregroundServiceType="dataSync" />\n'
      '    <service android:name=".AfifSipBridgeService" android:exported="false" android:foregroundServiceType="dataSync" />\n'
      '    <activity android:name=".AfifDomainCallActivity" android:exported="false" android:showWhenLocked="true" android:turnScreenOn="true" android:excludeFromRecents="true" android:launchMode="singleTop" />\n'
      '    <activity android:name=".AfifDomainDialActivity" android:exported="false" android:label="AFIF Direct" />\n'

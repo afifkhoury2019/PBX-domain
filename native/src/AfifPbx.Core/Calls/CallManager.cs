@@ -307,7 +307,14 @@ public sealed class CallManager
         {
             if (l is SipLeg s) s.Cancel(); else l.Hangup();
         }
-        if (answered is null) return caller.IsEnded;
+        if (answered is null)
+        {
+            // Nobody picked up (or every phone declined). Release the incoming caller too;
+            // otherwise a GSM caller could be answered after the app had already hung up,
+            // which looked like the dongle dropping the call.
+            if (!caller.IsEnded) caller.Hangup("noanswer");
+            return true;
+        }
         if (caller.IsEnded) { answered.Hangup(); return true; }
 
         if (!await caller.AnswerAsync().ConfigureAwait(false)) { answered.Hangup(); return true; }
