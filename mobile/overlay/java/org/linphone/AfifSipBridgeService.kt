@@ -253,13 +253,13 @@ class AfifSipBridgeService : Service() {
             d.answered = true
             val sdp = parseSdp(msg.body)
             if (sdp != null) startRtp(d, sdp)
-            sendAck(d, msg.first("Contact"))
+            sendAck(d, msg.first("Contact"), msg.first("To"))
             send(JSONObject().put("type", "answer"))
         } else if (code >= 300 && d.incoming && !d.answered) {
             d.remoteTag = tagOf(msg.first("To"))
             dialogs.remove(id)
             d.rtp?.close()
-            sendAck(d, msg.first("Contact"))
+            sendAck(d, msg.first("Contact"), msg.first("To"))
             send(JSONObject().put("type", "hangup"))
             Log.i("AFIF-BRIDGE", "incoming declined by Linphone: $code")
         }
@@ -412,13 +412,19 @@ class AfifSipBridgeService : Service() {
         } catch (_: Throwable) { false }
     }
 
-    private fun sendAck(d: Dialog, contact: String?) {
+    private fun sendAck(d: Dialog, contact: String?, toHeader: String?) {
         val target = contact?.substringAfter("<")?.substringBefore(">") ?: d.remote.toString()
+        // The request-URI is the 200 OK Contact, but the To header must stay the
+        // original To from the response (including its tag). Using Contact as To
+        // made Linphone treat the ACK as a different dialog; it retransmitted the
+        // 200 and then tore down the freshly answered incoming call.
+        val to = toHeader?.takeIf { it.isNotBlank() }
+            ?: "<sip:${AfifTransport.extension(this)}@127.0.0.1>${d.remoteTag?.let { ";tag=$it" } ?: ""}"
         val headers = mutableListOf(
             "Via" to "SIP/2.0/UDP 127.0.0.1:5070;branch=z9hG4bK${randomTag()}",
             "Max-Forwards" to "70",
             "From" to "<sip:${d.number}@afif-pbx>;tag=${d.localTag}",
-            "To" to "<$target>${d.remoteTag?.let { ";tag=$it" } ?: ""}",
+            "To" to to,
             "Call-ID" to d.callId,
             "CSeq" to "1 ACK",
             "Contact" to "<sip:${AfifTransport.extension(this)}@127.0.0.1:5070>"
@@ -432,7 +438,7 @@ class AfifSipBridgeService : Service() {
             "Via" to "SIP/2.0/UDP 127.0.0.1:5070;branch=z9hG4bK${randomTag()}",
             "Max-Forwards" to "70",
             "From" to "<sip:${AfifTransport.extension(this)}@afif-pbx>;tag=${d.localTag}",
-            "To" to "<sip:${d.number}@127.0.0.1>${d.remoteTag?.let { ";tag=$it" } ?: ""}",
+            "To" to "<sip:${if (d.incoming) AfifTransport.extension(this) else d.number}@127.0.0.1>${d.remoteTag?.let { ";tag=$it" } ?: ""}",
             "Call-ID" to d.callId,
             "CSeq" to "${++d.localCSeq} BYE"
         )

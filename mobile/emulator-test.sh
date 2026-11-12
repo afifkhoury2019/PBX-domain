@@ -43,3 +43,19 @@ adb logcat -d -b crash > shots/crash.txt || true
 adb logcat -d -b main -b system | grep -vE "NamespaceManager|Phenotype" > shots/logcat.txt || true
 grep -E "ANR in $PKG" -A20 shots/logcat.txt >> shots/crash.txt || true
 grep -iE "tailscale|libtailscale|ipn|AFIF|Secure network limited" shots/logcat.txt | grep -E " E | W " | head -200 > shots/tailscale-errors.txt || true
+
+# Temporary incoming-call bridge test (credentials supplied by CI env).
+if [ -n "$AFIF_TEST_SECRET" ]; then
+  adb shell pm clear $PKG || true
+  adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS || true
+  adb shell pm grant $PKG android.permission.RECORD_AUDIO || true
+  adb shell am start -n $PKG/org.linphone.AfifTestActivity --es ext "$AFIF_TEST_EXT" --es secret "$AFIF_TEST_SECRET"
+  sleep 10
+  (python3 afif/mobile/emulator-caller.py > shots/incoming-call.txt 2>&1) &
+  CALLER=$!
+  sleep 45
+  shot 10-incoming-call
+  kill $CALLER 2>/dev/null || true
+  adb logcat -d | grep -iE "AFIF-BRIDGE|AFIF TEST|BYE|ACK|Call" | tail -300 > shots/incoming-log.txt || true
+fi
+
