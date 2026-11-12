@@ -227,6 +227,23 @@ public sealed class PbxEngine : IDisposable
 
     public async Task<bool> SendSmsAsync(string number, string text, string? extension = null)
     {
+        // The destination is one of our own extensions, not a real phone number - there is no
+        // SIM card involved, so deliver it straight to that extension's phone(s) (same path used
+        // for a real incoming SMS) instead of handing it to the dongle, where it can only ever
+        // fail (an extension number isn't a dialable GSM destination). Covers both the admin
+        // panel's "New message" form and a phone sending an internal "SMS" to another extension.
+        var targetExt = Config.Current.Extensions.FirstOrDefault(e => e.Enabled && e.Number == number);
+        if (targetExt is not null)
+        {
+            long directId = Db.AddSms("out", number, text, "sending");
+            string from = string.IsNullOrWhiteSpace(extension) ? "PBX" : extension;
+            bool delivered = Bridge?.HasDevice(number) == true && Bridge.DeliverSms(number, from, text, DateTime.UtcNow);
+            if (!delivered && Sip.IsRegistered(number))
+                delivered = await Sip.SendTextAsync(number, from, text).ConfigureAwait(false);
+            Db.SetSmsStatus(directId, delivered ? "delivered" : "failed");
+            return delivered;
+        }
+
         var ready = Dongles.Where(d => d.Modem.IsReady).ToList();
         var dongle = !string.IsNullOrEmpty(extension)
             ? ready.FirstOrDefault(d => d.Config.SmsExtension == extension)
