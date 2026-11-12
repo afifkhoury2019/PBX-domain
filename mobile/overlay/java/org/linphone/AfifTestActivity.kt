@@ -19,8 +19,7 @@ class AfifTestActivity : Activity() {
         Handler(Looper.getMainLooper()).postDelayed({
             try {
                 val core = LinphoneApplication.coreContext.core
-                val address = Factory.instance().createAddress("sip:$number@127.0.0.1:5070")
-                core.invite(address)
+                core.invite("sip:$number@127.0.0.1:5070")
             } catch (e: Throwable) {
                 org.linphone.core.tools.Log.e("[AFIF TEST] invite failed: $e")
             }
