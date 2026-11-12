@@ -78,16 +78,15 @@ object AfifTransport {
     fun setMode(context: Context, mode: Int) {
         prefs(context).edit().putInt(MODE, mode).apply()
         if (mode == DOMAIN) {
-            // The direct WebSocket service (AfifDomainService) is the real Domain-mode
-            // transport. AfifSipBridgeService is the legacy local-SIP-bridge path - it must
-            // stay stopped here, since both register to the same wss://host/register/{ext}
-            // endpoint for the same extension, and running both concurrently causes them to
-            // repeatedly evict and replace each other's registration (including mid-call,
-            // which silently hands an in-progress call's audio to whichever service doesn't
-            // know about it and ends it).
-            AfifSipBridgeService.stop(context)
-            AfifDomainService.start(context)
-            Toast.makeText(context, "Domain mode: direct connection (no VPN)", Toast.LENGTH_SHORT).show()
+            // Domain mode MUST use the local SIP bridge, not AfifDomainService. The native
+            // Linphone account is pointed at 127.0.0.1:5070; if bootstrap() selected the
+            // direct service instead, every app launch would replace the bridge's one
+            // WebSocket registration, causing the registration churn and the call to be
+            // torn down a moment after it is answered.
+            AfifDomainService.stop(context)
+            AfifSipBridgeService.start(context)
+            AfifLocalSip.configure(context)
+            Toast.makeText(context, "Domain mode: local SIP bridge (no VPN)", Toast.LENGTH_SHORT).show()
         } else {
             AfifDomainService.stop(context)
             AfifSipBridgeService.stop(context)
@@ -95,11 +94,12 @@ object AfifTransport {
         }
     }
 
-    /** Start the direct service after a reboot/launch when Domain is already selected. */
+    /** Start the local SIP bridge after a reboot/launch when Domain is already selected. */
     fun bootstrap(context: Context) {
         if (isDomain(context) && secret(context).isNotEmpty()) {
-            AfifSipBridgeService.stop(context)
-            AfifDomainService.start(context)
+            AfifDomainService.stop(context)
+            AfifSipBridgeService.start(context)
+            AfifLocalSip.configure(context)
         }
     }
 
