@@ -78,10 +78,16 @@ object AfifTransport {
     fun setMode(context: Context, mode: Int) {
         prefs(context).edit().putInt(MODE, mode).apply()
         if (mode == DOMAIN) {
-            AfifDomainService.stop(context)
-            AfifSipBridgeService.start(context)
-            AfifLocalSip.configure(context)
-            Toast.makeText(context, "Domain mode: local SIP bridge", Toast.LENGTH_SHORT).show()
+            // The direct WebSocket service (AfifDomainService) is the real Domain-mode
+            // transport. AfifSipBridgeService is the legacy local-SIP-bridge path - it must
+            // stay stopped here, since both register to the same wss://host/register/{ext}
+            // endpoint for the same extension, and running both concurrently causes them to
+            // repeatedly evict and replace each other's registration (including mid-call,
+            // which silently hands an in-progress call's audio to whichever service doesn't
+            // know about it and ends it).
+            AfifSipBridgeService.stop(context)
+            AfifDomainService.start(context)
+            Toast.makeText(context, "Domain mode: direct connection (no VPN)", Toast.LENGTH_SHORT).show()
         } else {
             AfifDomainService.stop(context)
             AfifSipBridgeService.stop(context)
@@ -92,8 +98,8 @@ object AfifTransport {
     /** Start the direct service after a reboot/launch when Domain is already selected. */
     fun bootstrap(context: Context) {
         if (isDomain(context) && secret(context).isNotEmpty()) {
-            AfifSipBridgeService.start(context)
-            AfifLocalSip.configure(context)
+            AfifSipBridgeService.stop(context)
+            AfifDomainService.start(context)
         }
     }
 

@@ -162,9 +162,16 @@ class AfifDomainService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
+                // Several screens (dial, messages, voicemail, thread, main) call start()
+                // on every onCreate as a "make sure the service is up" safety net. If we
+                // already have a live socket, connect() would tear it down and reconnect -
+                // harmless at rest, but if a call is active that destroys its audio path
+                // mid-call for no reason. Only (re)connect when we don't already have an
+                // open connection.
+                val alreadyUp = running && socket != null && connected
                 running = true
-                startForeground(1001, ongoingNotification("Connecting…"))
-                connect()
+                startForeground(1001, ongoingNotification(if (alreadyUp) "Ready" else "Connecting…"))
+                if (!alreadyUp) connect()
             }
             ACTION_STOP -> {
                 running = false
