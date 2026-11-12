@@ -26,7 +26,6 @@ object AfifLocalSip {
                 p.identityAddress = identity
                 p.serverAddress = server
                 p.transport = TransportType.Udp
-                p.outboundProxy = "sip:$HOST:$PORT;transport=udp"
                 p.isOutboundProxyEnabled = true
                 existing.params = p
                 core.addAuthInfo(
@@ -38,7 +37,6 @@ object AfifLocalSip {
                 p.identityAddress = identity
                 p.serverAddress = server
                 p.transport = TransportType.Udp
-                p.outboundProxy = "sip:$HOST:$PORT;transport=udp"
                 p.isOutboundProxyEnabled = true
                 val account = core.createAccount(p)
                 core.addAccount(account)
