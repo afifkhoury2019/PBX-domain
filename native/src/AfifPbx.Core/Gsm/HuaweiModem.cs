@@ -176,7 +176,11 @@ public sealed class HuaweiModem : IDisposable
         {
             // ^CEND also arrives on the PCUI port; two empty lists mean the call
             // is really gone (a transient empty poll during setup is ignored).
-            if (++_noCallPolls >= 2) EndCall("ended");
+            if (++_noCallPolls >= 2)
+            {
+                _log.LogInformation("GSM call ended from state {State}: silently disappeared from AT+CLCC (no ^CEND/NO CARRIER seen)", _callState);
+                EndCall("ended");
+            }
         }
         else
         {
@@ -330,10 +334,11 @@ public sealed class HuaweiModem : IDisposable
                 _clip = m.Success ? m.Groups[1].Value : "";
                 if (_callState == "incoming") AnnounceIncoming();
             }
-            else if (line.StartsWith("^ORIG:")) SetCall("dialing");
-            else if (line.StartsWith("^CONF:")) { SetCall("alerting"); FireCallState("alerting", ""); }
+            else if (line.StartsWith("^ORIG:")) { _log.LogInformation("GSM call: dialing ({Line})", line); SetCall("dialing"); }
+            else if (line.StartsWith("^CONF:")) { _log.LogInformation("GSM call: alerting (ringing at the far end)"); SetCall("alerting"); FireCallState("alerting", ""); }
             else if (line.StartsWith("^CONN:"))
             {
+                _log.LogInformation("GSM call: answered");
                 SetCall("active");
                 FireCallState("answered", "");
                 _ = EnableVoicePathAsync();
@@ -343,10 +348,12 @@ public sealed class HuaweiModem : IDisposable
                 // ^CEND:idx,duration,end_status,cc_cause
                 var p = line.Substring(6).Split(',');
                 string cause = p.Length >= 4 ? CauseText(p[3].Trim()) : "ended";
+                _log.LogInformation("GSM call ended from state {State}: {Cause} (raw: {Line})", _callState, cause, line);
                 EndCall(cause);
             }
             else if (line is "NO CARRIER" or "BUSY" or "NO ANSWER")
             {
+                _log.LogInformation("GSM call ended from state {State}: {Line}", _callState, line);
                 EndCall(line.ToLowerInvariant());
             }
             else if (line.StartsWith("^RSSI:"))

@@ -397,9 +397,10 @@ public sealed class CallManager
         if (gsm.State != LegState.Answered)
         {
             string reason = gsm.IsEnded ? gsm.EndedTask.Result : "no answer";
+            _log.LogInformation("Call {Call}: GSM leg {Gsm} to {Number} did not answer ({Reason})", call.Id, gsm, number, reason);
             gsm.Hangup();
             call.Disposition = reason.Contains("busy") ? "BUSY" : "NO ANSWER";
-            caller.Hangup(reason.Contains("busy") ? "busy" : "unavailable");
+            caller.Hangup(reason.Contains("busy") ? "busy" : $"unavailable ({reason})");
             return;
         }
         if (!await caller.AnswerAsync().ConfigureAwait(false)) { gsm.Hangup(); return; }
