@@ -74,7 +74,10 @@ class AfifDomainMainActivity : Activity() {
             LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
         ))
         setContentView(root)
-        if (AfifTransport.isDomain(this)) AfifDomainService.start(this)
+        if (AfifTransport.isDomain(this)) {
+            AfifDomainService.start(this)
+            AfifBackground.checkDomain(this)
+        }
         refresh()
     }
 

@@ -43,6 +43,40 @@ object AfifBackground {
         }
     }
 
+    /**
+     * Same one-time battery-optimisation prompt as [check], but for Domain-mode users. Domain mode's
+     * screens (AfifDomainMainActivity and friends) never touch Linphone's own AssistantActivity/MainActivity,
+     * which is where [check] is wired in via apply.py - and `corePreferences.keepServiceAlive` is the legacy
+     * "Run in background" toggle for the old SIP/Tailscale transport, which a Domain-only user never sees
+     * either. Without this, Domain users are never asked for the exemption at all: Android is then free to
+     * throttle or periodically kill the foreground service's socket (most aggressively on OEM skins with
+     * strict battery/app-standby policies), which shows up as the phone's WebSocket registration repeatedly
+     * dropping and reconnecting every few seconds - long enough to drop any call that's in progress when it
+     * happens. Domain mode has no "off" state for this, so it is asked unconditionally (no keepServiceAlive
+     * gate), but shares the same ASKED flag/prefs as [check] so a user who already answered either prompt
+     * isn't asked a second time.
+     */
+    fun checkDomain(activity: Activity) {
+        if (isUnrestricted(activity)) return
+        val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(ASKED, false)) return
+        activity.window.decorView.post {
+            if (activity.isFinishing || activity.isDestroyed) return@post
+            prefs.edit().putBoolean(ASKED, true).apply()
+            AlertDialog.Builder(activity)
+                .setTitle("Keep calls reliable")
+                .setMessage(
+                    "To stop calls and messages from dropping when the phone is locked or the screen is off, " +
+                        "allow AFIF Phone to run without battery restrictions.\n\n" +
+                        "Without this, Android may periodically cut the connection in the background, " +
+                        "which can end a call a moment after it's answered."
+                )
+                .setPositiveButton("Allow") { _, _ -> request(activity) }
+                .setNegativeButton("Not now", null)
+                .show()
+        }
+    }
+
     fun request(activity: Activity) {
         try {
             activity.startActivity(
