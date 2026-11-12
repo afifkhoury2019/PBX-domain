@@ -5,6 +5,7 @@
 package org.linphone
 
 import android.content.Context
+import org.linphone.core.Core
 import org.linphone.core.Factory
 import org.linphone.core.TransportType
 
@@ -26,18 +27,19 @@ object AfifLocalSip {
                 p.identityAddress = identity
                 p.serverAddress = server
                 p.transport = TransportType.Udp
-                p.isOutboundProxyEnabled = true
+                p.isOutboundProxyEnabled = false
                 existing.params = p
                 core.addAuthInfo(
                     Factory.instance().createAuthInfo(extension, null, secret, null, null, HOST)
                 )
                 existing.refreshRegister()
+                rewriteContactDomains(core)
             } else {
                 val p = core.createAccountParams()
                 p.identityAddress = identity
                 p.serverAddress = server
                 p.transport = TransportType.Udp
-                p.isOutboundProxyEnabled = true
+                p.isOutboundProxyEnabled = false
                 val account = core.createAccount(p)
                 core.addAccount(account)
                 core.defaultAccount = account
@@ -48,6 +50,27 @@ object AfifLocalSip {
             }
         } catch (e: Throwable) {
             org.linphone.core.tools.Log.e("[AFIF] Local SIP config failed: $e")
+        }
+    }
+
+    /**
+     * Contacts imported from the old SIP account often carry a server domain such as
+     * "buff.pbx". Linphone then sends the call straight to that domain instead of the
+     * local bridge. Rewrite every non-local contact to the bridge so calls, including
+     * "My Home", actually go through the WebSocket transport.
+     */
+    private fun rewriteContactDomains(core: Core) {
+        try {
+            for (friend in core.friends) {
+                val address = friend.address ?: continue
+                val user = address.username ?: continue
+                val domain = address.domain.orEmpty()
+                if (domain.isNotEmpty() && domain != HOST && domain != "$HOST:$PORT") {
+                    friend.address = Factory.instance().createAddress("sip:$user@$HOST:$PORT")
+                }
+            }
+        } catch (e: Throwable) {
+            org.linphone.core.tools.Log.e("[AFIF] Contact domain rewrite failed: $e")
         }
     }
 }
