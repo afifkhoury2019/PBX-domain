@@ -139,6 +139,18 @@ class AfifSipBridgeService : Service() {
 
     // ------------------------------------------------------------ SIP socket
 
+    private fun localAddress(): String {
+        return try {
+            java.net.NetworkInterface.getNetworkInterfaces().toList()
+                .asSequence()
+                .filter { it.isUp && !it.isLoopback }
+                .flatMap { it.inetAddresses.toList().asSequence() }
+                .filterIsInstance<java.net.Inet4Address>()
+                .firstOrNull { it.isSiteLocalAddress }
+                ?.hostAddress ?: "127.0.0.1"
+        } catch (_: Throwable) { "127.0.0.1" }
+    }
+
     private fun startSip() {
         // Normally already bound by start()'s ensureSipBound(), well before this runs. Falls
         // back to binding directly here too, in case the service was restarted by Android
@@ -341,7 +353,7 @@ class AfifSipBridgeService : Service() {
         val remoteSdp = parseSdp(req.body)
         Log.i("AFIF-BRIDGE", "WS answered; localRtp=${rtp.port} remoteSdp=$remoteSdp")
         remoteSdp?.let { startRtp(d, it) }
-        val body = sdp(rtp.port)
+        val body = sdp(rtp.port, localAddress())
         respond(
             req, 200, "OK", body = body, toTag = d.toTag,
             extra = mutableListOf(
@@ -370,7 +382,7 @@ class AfifSipBridgeService : Service() {
         val ext = AfifTransport.extension(this)
         val callId = d.callId
         val fromTag = d.localTag
-        val body = sdp(rtp.port)
+        val body = sdp(rtp.port, localAddress())
         val headers = mutableListOf(
             "Via" to "SIP/2.0/UDP 127.0.0.1:5070;branch=z9hG4bK${randomTag()}",
             "Max-Forwards" to "70",
@@ -477,7 +489,7 @@ class AfifSipBridgeService : Service() {
         if (body.isNotEmpty()) headers.add("Content-Length" to body.toByteArray().size.toString())
         else headers.add("Content-Length" to "0")
         val p = buildSip("SIP/2.0 $code $reason", headers, body)
-        Log.i("AFIF-BRIDGE", "SIP => $code $reason ${req.first("Call-ID")} body=${body.length}")
+        Log.i("AFIF-BRIDGE", "SIP => $code $reason ${req.first("Call-ID")} body=${body.length} ${body.replace("\r\n", "|").take(500)}")
         try { sip?.send(DatagramPacket(p, p.size, req.remote)) } catch (_: Throwable) { }
     }
 
@@ -585,20 +597,20 @@ private fun tagOf(value: String?): String? =
 
 private fun randomTag(): String = Random.nextInt(100000, 999999).toString(16)
 
-private fun sdp(port: Int): String = """
-v=0
-o=- 0 0 IN IP4 127.0.0.1
-s=AFIF Bridge
-c=IN IP4 127.0.0.1
-t=0 0
-m=audio $port RTP/AVP 0 8 101
-a=rtpmap:0 PCMU/8000
-a=rtpmap:8 PCMA/8000
-a=rtpmap:101 telephone-event/8000
-a=fmtp:101 0-16
-a=ptime:20
-a=sendrecv
-""".trimIndent() + "\r\n"
+private fun sdp(port: Int, host: String): String = listOf(
+    "v=0",
+    "o=- ${System.currentTimeMillis()} ${System.currentTimeMillis()} IN IP4 $host",
+    "s=AFIF Bridge",
+    "c=IN IP4 $host",
+    "t=0 0",
+    "m=audio $port RTP/AVP 0 8 101",
+    "a=rtpmap:0 PCMU/8000",
+    "a=rtpmap:8 PCMA/8000",
+    "a=rtpmap:101 telephone-event/8000",
+    "a=fmtp:101 0-16",
+    "a=ptime:20",
+    "a=sendrecv"
+).joinToString("\r\n") + "\r\n"
 
 private fun parseSdp(body: String): Sdp? {
     val port = Regex("m=audio (\\d+) RTP/AVP ([0-9 ]+)").find(body) ?: return null
@@ -613,7 +625,7 @@ private fun parseSdp(body: String): Sdp? {
 }
 
 private class Rtp(private val requestedPort: Int) {
-    private var socket: DatagramSocket? = DatagramSocket(0, InetAddress.getByName("127.0.0.1"))
+    private var socket: DatagramSocket? = DatagramSocket(0)
     private var remote: InetSocketAddress? = null
     private var payloadType = 0
     private var seq = Random.nextInt(1, 30000)
