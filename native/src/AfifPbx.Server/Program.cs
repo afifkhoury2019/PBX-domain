@@ -86,7 +86,10 @@ app.Lifetime.ApplicationStopping.Register(() =>
     engine.Dispose();
 });
 
-app.UseWebSockets();
+// A short keep-alive interval so the server itself also pings every open bridge socket often - on top of
+// the phone's own 20s ping - so Cloudflare Tunnel (and any mobile-carrier NAT in between) always sees recent
+// activity on the connection and doesn't treat it as idle and tear it down.
+app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(15) });
 
 // Direct WebSocket registration used by AFIF Phone over Cloudflare Tunnel.
 app.Map("/register/{extension}", async (HttpContext ctx, string extension) =>

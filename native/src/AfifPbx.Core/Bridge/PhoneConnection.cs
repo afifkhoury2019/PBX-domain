@@ -42,11 +42,29 @@ public sealed class PhoneConnection
     /// or the timeout elapses.</summary>
     public void OfferRing(WsLeg leg, int ringSeconds)
     {
-        _activeLeg = leg;
+        AdoptActiveLeg(leg);
         leg.Attach(this);
-        leg.Ended += (_, _) => { if (ReferenceEquals(_activeLeg, leg)) _activeLeg = null; };
         _ = SendControlAsync(new { type = "ring", callId = leg.CallId, number = leg.Number, name = leg.Name });
         _ = RingTimeoutAsync(leg, ringSeconds);
+    }
+
+    /// <summary>Detaches and returns the leg this connection is currently carrying, if any, without ending
+    /// it. Used when a fresher connection for the same extension takes over - either an explicit replacement
+    /// (app restarted) or a reconnect reclaiming a leg that was being held for it (see
+    /// <see cref="AudioBridgeServer.HoldForReconnect"/>).</summary>
+    public WsLeg? TakeActiveLeg()
+    {
+        var leg = _activeLeg;
+        _activeLeg = null;
+        return leg;
+    }
+
+    /// <summary>Makes this connection the carrier for a leg that started life on a different connection
+    /// (or was offered via <see cref="OfferRing"/>). Does not touch the leg's own state.</summary>
+    public void AdoptActiveLeg(WsLeg leg)
+    {
+        _activeLeg = leg;
+        leg.Ended += (_, _) => { if (ReferenceEquals(_activeLeg, leg)) _activeLeg = null; };
     }
 
     private async Task RingTimeoutAsync(WsLeg leg, int ringSeconds)
@@ -109,7 +127,17 @@ public sealed class PhoneConnection
         catch (OperationCanceledException) { }
         catch (WebSocketException ex) { Log.LogInformation("Phone {Extension}: connection ended ({Message})", Extension, ex.Message); }
         catch (Exception ex) { Log.LogWarning(ex, "Phone {Extension}: receive loop failed", Extension); }
-        finally { _activeLeg?.Hangup("phone disconnected"); }
+        finally
+        {
+            // Don't hang the call up the instant this socket dies - mobile connections blip (cellular
+            // handover, a brief Cloudflare Tunnel hiccup, Doze) and the app auto-reconnects within a few
+            // seconds. Hold the leg for a short grace window so that reconnect can pick the call back up
+            // instead of the caller hearing it drop on every network wobble. If nothing reclaims it in time,
+            // it ends exactly as before.
+            var leg = TakeActiveLeg();
+            if (leg is { State: not Calls.LegState.Ended })
+                _registry.HoldForReconnect(Extension, leg);
+        }
     }
 
     private void HandleControlMessage(string json)
@@ -132,9 +160,8 @@ public sealed class PhoneConnection
                     {
                         var number = doc.RootElement.TryGetProperty("number", out var n) ? n.GetString() ?? "" : "";
                         var leg = new WsLeg(Guid.NewGuid().ToString("N"), Extension, number, "");
+                        AdoptActiveLeg(leg);
                         leg.Attach(this);
-                        _activeLeg = leg;
-                        leg.Ended += (_, _) => { if (ReferenceEquals(_activeLeg, leg)) _activeLeg = null; };
                         _registry.RaiseOutboundCallRequested(leg, number);
                         break;
                     }

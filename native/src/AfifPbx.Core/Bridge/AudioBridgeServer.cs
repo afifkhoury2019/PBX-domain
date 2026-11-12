@@ -27,6 +27,12 @@ public sealed class AudioBridgeServer
 
     private readonly ConfigStore _config;
     private readonly ConcurrentDictionary<string, PhoneConnection> _phones = new();
+    private readonly ConcurrentDictionary<string, (WsLeg Leg, CancellationTokenSource Cts)> _pendingHandoff = new();
+
+    /// <summary>How long a call leg is kept alive, unattached to any socket, after its phone's connection
+    /// drops - giving the app's own reconnect (or a brief cellular/tunnel blip) a chance to resume the call
+    /// instead of it being hung up on every transient disconnect.</summary>
+    private static readonly TimeSpan ReconnectGraceWindow = TimeSpan.FromSeconds(25);
 
     /// <summary>Raised when a phone dials out through the PBX (e.g. to the GSM line) rather than being rung
     /// by it. Carries the leg representing the phone and the number it asked to dial.</summary>
@@ -113,12 +119,30 @@ public sealed class AudioBridgeServer
             return;
         }
 
-        // A phone reconnecting (app restart, network blip) replaces its own prior connection.
-        if (_phones.TryRemove(extension, out var old)) old.Close("replaced by new connection");
+        // A phone reconnecting (app restart, network blip) replaces its own prior connection. If that prior
+        // connection (or a since-dropped one still in its post-disconnect grace window) was mid-call, carry
+        // the call straight over to this new socket instead of letting it be hung up.
+        WsLeg? handoffLeg = null;
+        if (_phones.TryRemove(extension, out var old))
+        {
+            handoffLeg = old.TakeActiveLeg();
+            old.Close("replaced by new connection");
+        }
+        if (handoffLeg is null && _pendingHandoff.TryRemove(extension, out var pending))
+        {
+            pending.Cts.Cancel();
+            if (pending.Leg.State != Calls.LegState.Ended) handoffLeg = pending.Leg;
+        }
 
         var conn = new PhoneConnection(extension, socket, this);
         _phones[extension] = conn;
         Log.LogInformation("Phone registered for extension {Extension}", extension);
+        if (handoffLeg is not null)
+        {
+            conn.AdoptActiveLeg(handoffLeg);
+            handoffLeg.Attach(conn);
+            Log.LogInformation("Call carried over to new connection for extension {Extension} after reconnect", extension);
+        }
         PhoneRegistered?.Invoke(extension);
         try
         {
@@ -131,6 +155,33 @@ public sealed class AudioBridgeServer
         }
     }
 
+    /// <summary>Called by <see cref="PhoneConnection"/> when its socket ends while it was carrying a call.
+    /// Rather than hanging the call up immediately - which would end it on every brief network wobble - this
+    /// holds the leg, unattached, for <see cref="ReconnectGraceWindow"/> so a quick reconnect (the app's own
+    /// auto-reconnect, a cellular handover, a momentary Cloudflare Tunnel hiccup) can reclaim it via
+    /// <see cref="AcceptAsync"/>. If nothing reclaims it in time, the call ends exactly as it used to.</summary>
+    internal void HoldForReconnect(string extension, WsLeg leg)
+    {
+        var cts = new CancellationTokenSource();
+        _pendingHandoff[extension] = (leg, cts);
+        leg.Ended += (_, _) =>
+        {
+            cts.Cancel();
+            _pendingHandoff.TryRemove(new KeyValuePair<string, (WsLeg, CancellationTokenSource)>(extension, (leg, cts)));
+        };
+        _ = Task.Run(async () =>
+        {
+            try { await Task.Delay(ReconnectGraceWindow, cts.Token).ConfigureAwait(false); }
+            catch (OperationCanceledException) { return; }
+            if (_pendingHandoff.TryRemove(extension, out var entry) && ReferenceEquals(entry.Leg, leg))
+            {
+                Log.LogInformation("Phone {Extension} did not reconnect within {Seconds}s; ending the call",
+                    extension, ReconnectGraceWindow.TotalSeconds);
+                leg.Hangup("phone disconnected");
+            }
+        });
+    }
+
     /// <summary>Close every phone socket, e.g. when the domain transport is switched off.</summary>
     public void CloseAll()
     {
@@ -139,6 +190,15 @@ public sealed class AudioBridgeServer
             try { conn.Close("domain transport disabled"); } catch { }
         }
         _phones.Clear();
+
+        // Don't let calls linger in their reconnect grace window once the transport itself has been turned
+        // off - there is no socket coming back to reclaim them.
+        foreach (var (leg, cts) in _pendingHandoff.Values.ToList())
+        {
+            try { cts.Cancel(); } catch { }
+            if (leg.State != Calls.LegState.Ended) leg.Hangup("domain transport disabled");
+        }
+        _pendingHandoff.Clear();
     }
 
     private static async Task CloseAsync(WebSocket socket, WebSocketCloseStatus status, string reason)
