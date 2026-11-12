@@ -44,10 +44,37 @@ class AfifSipBridgeService : Service() {
         @Volatile var lastError = ""
         @Volatile var registration = ""
 
+        // Bound synchronously here, on the caller's thread, before the Service is even
+        // dispatched - not just inside the Service's own onStartCommand(). Android queues
+        // startForegroundService() and can take a few hundred ms to actually call onCreate()/
+        // onStartCommand() on a cold start, and login() points Linphone's native SIP engine at
+        // 127.0.0.1:5070 and triggers its first REGISTER right after calling start() here, on
+        // the same thread, with no delay. If nothing was listening on that port yet, that first
+        // REGISTER was simply dropped - the exact "registration failed, open AFIF Phone to
+        // refresh" notification seen on first-time login. Binding the socket here, before start()
+        // returns, guarantees it's already listening by the time that REGISTER is sent. The
+        // Service instance adopts this socket in startSip() instead of creating its own.
+        @Volatile private var preboundSip: DatagramSocket? = null
+
+        fun ensureSipBound(): DatagramSocket? {
+            preboundSip?.let { if (!it.isClosed) return it }
+            return try {
+                val s = DatagramSocket(null)
+                s.reuseAddress = true
+                s.bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 5070))
+                preboundSip = s
+                s
+            } catch (e: Throwable) {
+                lastError = "Local SIP port: ${e.message}"
+                null
+            }
+        }
+
         fun start(context: Context) {
             // See the matching guard in AfifDomainService.start() - these two services must
             // never both hold a registration for the same extension at once.
             AfifDomainService.stop(context)
+            ensureSipBound()
             val i = Intent(context, AfifSipBridgeService::class.java).setAction(ACTION_START)
             if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(i) else context.startService(i)
         }
@@ -112,10 +139,15 @@ class AfifSipBridgeService : Service() {
     // ------------------------------------------------------------ SIP socket
 
     private fun startSip() {
+        // Normally already bound by start()'s ensureSipBound(), well before this runs. Falls
+        // back to binding directly here too, in case the service was restarted by Android
+        // itself (START_STICKY) without going through start().
+        val s = ensureSipBound()
+        if (s == null) {
+            updateNote(lastError)
+            return
+        }
         try {
-            val s = DatagramSocket(null)
-            s.reuseAddress = true
-            s.bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 5070))
             sip = s
             sipThread = Thread {
                 val buf = ByteArray(65535)
@@ -477,6 +509,10 @@ class AfifSipBridgeService : Service() {
         ws = null
         try { sip?.close() } catch (_: Throwable) { }
         sip = null
+        // Release the companion-level socket too (same underlying socket as sip, normally),
+        // so a real stop actually frees 127.0.0.1:5070 instead of leaving it pre-bound forever.
+        try { preboundSip?.close() } catch (_: Throwable) { }
+        preboundSip = null
         connected = false
     }
 
