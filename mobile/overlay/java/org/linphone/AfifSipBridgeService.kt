@@ -20,6 +20,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -170,6 +171,7 @@ class AfifSipBridgeService : Service() {
 
     private fun onSip(text: String, remote: InetSocketAddress) {
         val msg = parseSip(text, remote) ?: return
+        Log.i("AFIF-BRIDGE", "SIP <= ${msg.start} from ${remote.address}:${remote.port}")
         when {
             msg.start.startsWith("SIP/2.0") -> onResponse(msg)
             msg.start.startsWith("REGISTER") -> onRegister(msg, remote)
@@ -206,12 +208,14 @@ class AfifSipBridgeService : Service() {
         val number = uriUser(req.first("To")) ?: uriUser(req.start) ?: ""
         val d = Dialog(callId, false, number, remote, randomTag(), tagOf(req.first("From")), req)
         dialogs[callId] = d
+        Log.i("AFIF-BRIDGE", "INVITE $callId number=$number sdp=${req.body.replace("\r\n", "|")}")
         respond(req, 100, "Trying")
         respond(req, 180, "Ringing", toTag = d.toTag)
         send(JSONObject().put("type", "dial").put("number", number))
     }
 
     private fun onBye(msg: Sip) {
+        Log.i("AFIF-BRIDGE", "BYE from Linphone")
         val id = msg.first("Call-ID") ?: return
         val d = dialogs.remove(id) ?: return
         d.rtp?.close()
@@ -220,6 +224,7 @@ class AfifSipBridgeService : Service() {
     }
 
     private fun onCancel(msg: Sip) {
+        Log.i("AFIF-BRIDGE", "CANCEL from Linphone")
         val id = msg.first("Call-ID") ?: return
         val d = dialogs.remove(id) ?: return
         d.rtp?.close()
@@ -333,7 +338,9 @@ class AfifSipBridgeService : Service() {
         d.answered = true
         val req = d.request ?: return
         val rtp = d.rtp ?: Rtp(0).also { d.rtp = it }
-        parseSdp(req.body)?.let { startRtp(d, it) }
+        val remoteSdp = parseSdp(req.body)
+        Log.i("AFIF-BRIDGE", "WS answered; localRtp=${rtp.port} remoteSdp=$remoteSdp")
+        remoteSdp?.let { startRtp(d, it) }
         val body = sdp(rtp.port)
         respond(
             req, 200, "OK", body = body, toTag = d.toTag,
@@ -470,6 +477,7 @@ class AfifSipBridgeService : Service() {
         if (body.isNotEmpty()) headers.add("Content-Length" to body.toByteArray().size.toString())
         else headers.add("Content-Length" to "0")
         val p = buildSip("SIP/2.0 $code $reason", headers, body)
+        Log.i("AFIF-BRIDGE", "SIP => $code $reason ${req.first("Call-ID")} body=${body.length}")
         try { sip?.send(DatagramPacket(p, p.size, req.remote)) } catch (_: Throwable) { }
     }
 
@@ -613,6 +621,7 @@ private class Rtp(private val requestedPort: Int) {
     private var ssrc = Random.nextInt()
     private var listener: ((ByteArray) -> Unit)? = null
     private var thread: Thread? = null
+    private var loggedFirst = false
     val port: Int get() = socket?.localPort ?: requestedPort
 
     fun start(host: InetAddress, remotePort: Int, pt: Int, onPcm: (ByteArray) -> Unit) {
@@ -654,6 +663,10 @@ private class Rtp(private val requestedPort: Int) {
 
     private fun decode(packet: ByteArray) {
         val pt = packet[1].toInt() and 0x7F
+        if (!loggedFirst) {
+            loggedFirst = true
+            Log.i("AFIF-BRIDGE", "RTP first packet pt=$pt bytes=${packet.size} from=$remote")
+        }
         if (pt != 0 && pt != 8) return
         val pcm = if (pt == 8) decodeAlaw(packet.copyOfRange(12, packet.size))
         else decodeUlaw(packet.copyOfRange(12, packet.size))
