@@ -45,6 +45,9 @@ class AfifSipBridgeService : Service() {
         @Volatile var registration = ""
 
         fun start(context: Context) {
+            // See the matching guard in AfifDomainService.start() - these two services must
+            // never both hold a registration for the same extension at once.
+            AfifDomainService.stop(context)
             val i = Intent(context, AfifSipBridgeService::class.java).setAction(ACTION_START)
             if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(i) else context.startService(i)
         }

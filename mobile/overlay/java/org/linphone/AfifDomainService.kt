@@ -72,6 +72,13 @@ class AfifDomainService : Service() {
         @Volatile var voicemailError = ""
 
         fun start(context: Context) {
+            // AfifSipBridgeService registers this same extension's wss://host/register/{extension}
+            // socket on its own, from a separate code path (notably Linphone's own login screen,
+            // via apply.py) that doesn't know about this service. If both ever ran at once, each
+            // would repeatedly evict the other's registration, cycling every few seconds and
+            // killing any call in progress a moment after it's answered. Make sure of the opposite
+            // the other is stopped no matter which entry point started this one.
+            AfifSipBridgeService.stop(context)
             val i = Intent(context, AfifDomainService::class.java).setAction(ACTION_START)
             if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(i) else context.startService(i)
         }

@@ -436,6 +436,16 @@ edit(tpvm, "    val outboundProxy = MutableLiveData<String>()",
 edit(tpvm, "        registrationInProgress.value = false",
      "        registrationInProgress.value = false\n"
      "        try { cm.registerDefaultNetworkCallback(networkCallback) } catch (_: Throwable) {}")
+# Logging in here starts the local SIP bridge directly, bypassing AfifTransport.setMode()/
+# bootstrap() - the only place that normally guarantees AfifDomainService isn't also running.
+# bootstrap() starts AfifDomainService on every app launch whenever Domain mode is already
+# selected, so a user who then explicitly logs out and back in here (the native Linphone login
+# screen) ends up with BOTH services holding their own separate WebSocket registration to the
+# same wss://host/register/{extension} endpoint at once. Each evicts the other's registration
+# whenever either reconnects, which is the exact ~5-second registration-churn loop that was
+# dropping calls a moment after they were answered. Stop AfifDomainService here too so only one
+# of the two is ever alive, regardless of which path (bootstrap, setMode, or this login screen)
+# started the Domain-mode transport.
 edit(tpvm, "    fun login() {",
      "    override fun onCleared() {\n"
      "        try { cm.unregisterNetworkCallback(networkCallback) } catch (_: Throwable) {}\n"
@@ -449,6 +459,7 @@ edit(tpvm, "    fun login() {",
      "                username.value.orEmpty(),\n"
      "                password.value.orEmpty()\n"
      "            )\n"
+     "            org.linphone.AfifDomainService.stop(coreContext.context)\n"
      "            org.linphone.AfifSipBridgeService.start(coreContext.context)\n"
      "        }")
 # Force the SIP identity to the local bridge when WebSocket mode is selected.
