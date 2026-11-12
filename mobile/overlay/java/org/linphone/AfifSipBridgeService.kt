@@ -276,7 +276,7 @@ class AfifSipBridgeService : Service() {
             .build()
         ws = client.newWebSocket(req, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                if (socket !== webSocket) { webSocket.close(1000, "stale"); return }
+                if (ws !== webSocket) { webSocket.close(1000, "stale"); return }
                 connected = true
                 lastError = ""
                 updateNote("WebSocket connected")
@@ -289,7 +289,7 @@ class AfifSipBridgeService : Service() {
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                if (socket !== webSocket) return
+                if (ws !== webSocket) return
                 connected = false
                 lastError = t.message ?: "WebSocket failed"
                 updateNote(lastError)
@@ -297,7 +297,7 @@ class AfifSipBridgeService : Service() {
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                if (socket !== webSocket) return
+                if (ws !== webSocket) return
                 connected = false
                 scheduleReconnect()
             }
