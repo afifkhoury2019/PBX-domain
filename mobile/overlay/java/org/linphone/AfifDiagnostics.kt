@@ -142,6 +142,8 @@ object AfifDiagnostics {
                 doOutput = true
                 setRequestProperty("Content-Type", "text/plain; charset=utf-8")
                 setRequestProperty("X-AFIF-Client", "afif-phone")
+                // Cloudflare's browser-integrity rule rejects the default Dalvik UA.
+                setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) AFIFPhone/1.0")
                 setRequestProperty("X-AFIF-Extension", AfifTransport.extension(context))
                 setRequestProperty("X-AFIF-Secret", AfifTransport.secret(context))
             }
