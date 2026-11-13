@@ -382,7 +382,15 @@ class AfifSipBridgeService : Service() {
 
     private fun remoteHangup() {
         val d = dialogs.values.firstOrNull() ?: return
-        if (d.answered) sendByeToLocal(d) else sendCancelToLocal(d)
+        // Terminate through Linphone itself first. Hand-built BYE headers can miss
+        // the dialog tag/route, in which case Linphone keeps showing the call even
+        // though the PBX/GSM side has already hung up.
+        try {
+            val core = LinphoneApplication.coreContext.core
+            (core.currentCall ?: core.calls.firstOrNull())?.terminate()
+        } catch (_: Throwable) {
+            if (d.answered) sendByeToLocal(d) else sendCancelToLocal(d)
+        }
         dialogs.remove(d.callId)
         d.rtp?.close()
         AfifDiagnostics.event(this, "remote hangup")
@@ -604,6 +612,11 @@ private fun parseSip(raw: String, remote: InetSocketAddress): Sip? {
 private fun buildSip(start: String, headers: List<Pair<String, String>>, body: String): ByteArray {
     val sb = StringBuilder(start).append("\r\n")
     headers.forEach { sb.append(it.first).append(": ").append(it.second).append("\r\n") }
+    // Linphone ignores an SDP body when the outgoing INVITE has no Content-Length;
+    // it then answers the incoming call with no SDP and hangs up. Always frame it.
+    if (headers.none { it.first.equals("Content-Length", true) }) {
+        sb.append("Content-Length: ").append(body.toByteArray(Charsets.UTF_8).size).append("\r\n")
+    }
     sb.append("\r\n").append(body)
     return sb.toString().toByteArray(Charsets.UTF_8)
 }
