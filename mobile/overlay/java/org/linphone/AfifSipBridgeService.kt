@@ -184,6 +184,7 @@ class AfifSipBridgeService : Service() {
     private fun onSip(text: String, remote: InetSocketAddress) {
         val msg = parseSip(text, remote) ?: return
         Log.i("AFIF-BRIDGE", "SIP <= ${msg.start} from ${remote.address}:${remote.port}")
+        AfifDiagnostics.event(this, "SIP <= ${msg.start}")
         when {
             msg.start.startsWith("SIP/2.0") -> onResponse(msg)
             msg.start.startsWith("REGISTER") -> onRegister(msg, remote)
@@ -228,6 +229,8 @@ class AfifSipBridgeService : Service() {
 
     private fun onBye(msg: Sip) {
         Log.i("AFIF-BRIDGE", "BYE from Linphone")
+        AfifDiagnostics.event(this, "BYE from Linphone")
+        AfifDiagnostics.uploadEventLog(this, "bye")
         val id = msg.first("Call-ID") ?: return
         val d = dialogs.remove(id) ?: return
         d.rtp?.close()
@@ -237,6 +240,8 @@ class AfifSipBridgeService : Service() {
 
     private fun onCancel(msg: Sip) {
         Log.i("AFIF-BRIDGE", "CANCEL from Linphone")
+        AfifDiagnostics.event(this, "CANCEL from Linphone")
+        AfifDiagnostics.uploadEventLog(this, "cancel")
         val id = msg.first("Call-ID") ?: return
         val d = dialogs.remove(id) ?: return
         d.rtp?.close()
@@ -248,6 +253,7 @@ class AfifSipBridgeService : Service() {
         val id = msg.first("Call-ID") ?: return
         val d = dialogs[id] ?: return
         val code = msg.start.split(" ").getOrNull(1)?.toIntOrNull() ?: return
+        AfifDiagnostics.event(this, "SIP response $code to=${msg.first("To")} contact=${msg.first("Contact")} sdp=${msg.body.replace("\r\n", "|").take(500)}")
         if (code == 200 && d.incoming && !d.answered) {
             d.remoteTag = tagOf(msg.first("To"))
             d.answered = true
@@ -262,6 +268,7 @@ class AfifSipBridgeService : Service() {
             sendAck(d, msg.first("Contact"), msg.first("To"))
             send(JSONObject().put("type", "hangup"))
             Log.i("AFIF-BRIDGE", "incoming declined by Linphone: $code")
+            AfifDiagnostics.uploadEventLog(this, "declined-$code")
         }
     }
 
@@ -378,6 +385,8 @@ class AfifSipBridgeService : Service() {
         if (d.answered) sendByeToLocal(d) else sendCancelToLocal(d)
         dialogs.remove(d.callId)
         d.rtp?.close()
+        AfifDiagnostics.event(this, "remote hangup")
+        AfifDiagnostics.uploadEventLog(this, "remote-hangup")
     }
 
     private fun startRtp(d: Dialog, sdp: Sdp) {

@@ -125,20 +125,26 @@ app.UseStaticFiles(new StaticFileOptions
     OnPrepareResponse = c => c.Context.Response.Headers.CacheControl = "no-cache",
 });
 
-// AFIF Phone posts crash reports and diagnostic logs here. It is reachable
-// without an admin cookie so a crashing app can still upload, but only from
-// the LAN / secure-network ranges.
+// AFIF Phone posts crash reports and diagnostic logs here. The app may be
+// outside the LAN now (Domain mode), so an extension secret can authorize the
+// upload; otherwise the old private-network restriction still applies.
 app.MapPost("/client-log", async (HttpRequest req) =>
 {
     var ip = req.HttpContext.Connection.RemoteIpAddress ?? IPAddress.None;
-    if (!IsPrivateAddress(ip)) return Results.StatusCode(403);
+    var logExt = req.Headers["X-AFIF-Extension"].ToString().Trim();
+    var logSecret = req.Headers["X-AFIF-Secret"].ToString();
+    var authorized = logExt.Length > 0 && logSecret.Length > 0 &&
+        engine.Config.Current.Extensions.Any(e =>
+            e.Enabled && e.Number == logExt && e.Secret == logSecret);
+    if (!authorized && !IsPrivateAddress(ip)) return Results.StatusCode(403);
     using var reader = new StreamReader(req.Body, System.Text.Encoding.UTF8);
     string body = await reader.ReadToEndAsync();
     if (body.Length == 0) return Results.BadRequest();
     if (body.Length > 2_000_000) return Results.StatusCode(413);
     var dir = Path.Combine(dataDir, "Logs");
     Directory.CreateDirectory(dir);
-    var file = Path.Combine(dir, $"client-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.log");
+    var tag = logExt.Length > 0 ? logExt : "lan";
+    var file = Path.Combine(dir, $"client-{tag}-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.log");
     await File.WriteAllTextAsync(file, body);
     return Results.Ok(new { saved = Path.GetFileName(file) });
 });

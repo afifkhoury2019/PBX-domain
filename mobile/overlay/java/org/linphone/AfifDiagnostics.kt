@@ -26,7 +26,7 @@ import java.util.Locale
  */
 object AfifDiagnostics {
     private const val TAG = "[AFIF Diagnostics]"
-    private const val ENDPOINT = "http://192.168.0.224:8090/client-log"
+    private const val ENDPOINT = "https://pbx.powerchain.uk/client-log"
     private const val MAX_EVENT_BYTES = 64 * 1024
     private const val CRASH_PREFIX = "afif-crash-"
 
@@ -106,13 +106,33 @@ object AfifDiagnostics {
             } catch (_: Throwable) {
                 continue
             }
-            if (post(body)) {
+            if (post(context, body)) {
                 try { file.delete() } catch (_: Throwable) {}
             }
         }
+        uploadEventLog(context, "startup")
     }
 
-    private fun post(body: String): Boolean {
+    /**
+     * Send the AFIF event log (including the bridge SIP transcript) to the PBX
+     * even when the phone is outside the LAN. Used after calls and from the
+     * watchdog so the failure can be inspected remotely.
+     */
+    fun uploadEventLog(context: Context, reason: String) {
+        Thread {
+            try {
+                val f = File(context.filesDir, "afif-events.log")
+                if (!f.exists() || f.length() < 8) return@Thread
+                val body = "AFIF Phone event log\nreason=$reason\n" +
+                    "device=" + Build.MANUFACTURER + " " + Build.MODEL +
+                    " / Android " + Build.VERSION.RELEASE + "\n\n" + f.readText()
+                post(context, body)
+            } catch (_: Throwable) {
+            }
+        }.start()
+    }
+
+    private fun post(context: Context, body: String): Boolean {
         var connection: HttpURLConnection? = null
         return try {
             connection = (URL(ENDPOINT).openConnection() as HttpURLConnection).apply {
@@ -122,6 +142,8 @@ object AfifDiagnostics {
                 doOutput = true
                 setRequestProperty("Content-Type", "text/plain; charset=utf-8")
                 setRequestProperty("X-AFIF-Client", "afif-phone")
+                setRequestProperty("X-AFIF-Extension", AfifTransport.extension(context))
+                setRequestProperty("X-AFIF-Secret", AfifTransport.secret(context))
             }
             connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
             connection.responseCode in 200..299
