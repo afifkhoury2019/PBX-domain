@@ -53,7 +53,7 @@ object AfifLocalSip {
             // the same extension twice (sip:100 and ws:100); declining one leg leaves the
             // other one alive, which showed up as an immediate drop / stray Resume button.
             val keep = core.defaultAccount
-            for (account in core.accounts.toList()) {
+            for (account in core.accountList.toList()) {
                 if (account != keep) {
                     try { core.removeAccount(account) } catch (_: Throwable) {}
                 }
