@@ -316,6 +316,13 @@ public sealed class CallManager
             return true;
         }
         if (caller.IsEnded) { answered.Hangup(); return true; }
+        if (answered.IsEnded)
+        {
+            // The phone answered then cancelled/hung up while the GSM caller was still
+            // ringing. Do not answer the GSM leg into a dead bridge.
+            if (!caller.IsEnded) caller.Hangup("noanswer");
+            return true;
+        }
 
         if (!await caller.AnswerAsync().ConfigureAwait(false)) { answered.Hangup(); return true; }
         await ConnectAsync(call, caller, answered).ConfigureAwait(false);

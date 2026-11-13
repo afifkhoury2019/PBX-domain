@@ -5,6 +5,8 @@
 package org.linphone
 
 import android.content.Context
+import org.linphone.core.Account
+import org.linphone.core.Core
 import org.linphone.core.Factory
 import org.linphone.core.TransportType
 
@@ -45,6 +47,16 @@ object AfifLocalSip {
                     Factory.instance().createAuthInfo(extension, null, secret, null, null, HOST)
                 )
                 core.refreshRegisters()
+            }
+            // A phone upgraded from the old setup can still have its direct SIP account
+            // registered to the PBX alongside the local bridge. That makes the PBX ring
+            // the same extension twice (sip:100 and ws:100); declining one leg leaves the
+            // other one alive, which showed up as an immediate drop / stray Resume button.
+            val keep = core.defaultAccount
+            for (account in core.accounts.toList()) {
+                if (account != keep) {
+                    try { core.removeAccount(account) } catch (_: Throwable) {}
+                }
             }
         } catch (e: Throwable) {
             org.linphone.core.tools.Log.e("[AFIF] Local SIP config failed: $e")
