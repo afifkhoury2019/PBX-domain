@@ -58,9 +58,30 @@ object AfifLocalSip {
                     try { core.removeAccount(account) } catch (_: Throwable) {}
                 }
             }
+            rewriteFriendDomains(core)
         } catch (e: Throwable) {
             org.linphone.core.tools.Log.e("[AFIF] Local SIP config failed: $e")
         }
     }
 
+    /**
+     * Contacts imported from the old SIP account often carry a server domain such as
+     * "buff.pbx". Linphone then sends the call straight to that domain instead of the
+     * local bridge. Rewrite every non-local friend to the bridge so "My Home" and other
+     * saved contacts use the WebSocket transport too.
+     */
+    private fun rewriteFriendDomains(core: Core) {
+        try {
+            for (friend in core.friendList) {
+                val address = friend.address ?: continue
+                val user = address.username ?: continue
+                val domain = address.domain.orEmpty()
+                if (domain.isNotEmpty() && domain != HOST && domain != "$HOST:$PORT") {
+                    friend.address = Factory.instance().createAddress("sip:$user@$HOST:$PORT")
+                }
+            }
+        } catch (e: Throwable) {
+            org.linphone.core.tools.Log.e("[AFIF] Contact domain rewrite failed: $e")
+        }
+    }
 }
