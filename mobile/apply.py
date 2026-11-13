@@ -405,6 +405,7 @@ edit(manifest,
      '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n'
      '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />\n'
      '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />\n'
+     '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />\n'
      '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n'
      '    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />\n'
      '    <uses-permission android:name="android.permission.READ_CONTACTS" />')
@@ -416,7 +417,9 @@ edit(manifest, "</application>",
      '        <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /></intent-filter>\n'
      '    </receiver>\n'
      '    <service android:name=".AfifDomainService" android:exported="false" android:foregroundServiceType="dataSync" />\n'
-     '    <service android:name=".AfifSipBridgeService" android:exported="false" android:foregroundServiceType="dataSync" />\n'
+     '    <service android:name=".AfifSipBridgeService" android:exported="false" android:foregroundServiceType="specialUse">\n'
+     '        <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="voip-bridge" />\n'
+     '    </service>\n'
      '    <activity android:name=".AfifDomainCallActivity" android:exported="false" android:showWhenLocked="true" android:turnScreenOn="true" android:excludeFromRecents="true" android:launchMode="singleTop" />\n'
      '    <activity android:name=".AfifDomainDialActivity" android:exported="false" android:label="AFIF Direct" />\n'
      '    <activity android:name=".AfifDomainMessagesActivity" android:exported="false" android:label="AFIF Direct Messages" />\n'
