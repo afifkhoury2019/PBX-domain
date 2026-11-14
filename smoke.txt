@@ -1,0 +1,118 @@
+**********************
+PowerShell transcript start
+Start time: 20261114203739
+Username: runnervmm7ud1\runneradmin
+RunAs User: runnervmm7ud1\runneradmin
+Configuration Name: 
+Machine: runnervmm7ud1 (Microsoft Windows NT 10.0.26100.0)
+Host Application: C:\Program Files\PowerShell\7\pwsh.dll -command . 'D:\a\_temp\94de4329-c94b-4d6e-86a2-d56931ff1a72.ps1'
+Process ID: 2948
+PSVersion: 7.6.9
+PSEdition: Core
+GitCommitId: 7.6.9
+OS: Microsoft Windows 10.0.26100
+Platform: Win32NT
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1, 6.0, 7.0
+PSRemotingProtocolVersion: 2.4
+SerializationVersion: 1.1.0.1
+WSManStackVersion: 3.0
+**********************
+{
+  "running": true,
+  "version": "2.0.13",
+  "httpPort": 8090,
+  "sipPort": 5060,
+  "addresses": [
+    "10.1.0.5",
+    "172.20.192.1"
+  ],
+  "registered": 0,
+  "extensions": 2,
+  "activeCalls": 0,
+  "modem": {
+    "state": "no-device",
+    "message": "No GSM dongle found. Plug in the Huawei dongle.",
+    "manufacturer": "",
+    "model": "",
+    "firmware": "",
+    "imei": "",
+    "imsi": "",
+    "operator": "",
+    "ownNumber": "",
+    "rssi": 99,
+    "registered": false,
+    "registration": "",
+    "voiceEnabled": null,
+    "atPort": "",
+    "audioPort": "",
+    "callState": "idle",
+    "signalPercent": 0
+  },
+  "newVoicemails": 0
+}
+SIP ports in settings: 5160
+Secure network before: installed=True enabled=False ports=5060,5160
+Connect: Open the link to sign in. https://login.tailscale.com/a/g80668695b480364d
+{
+  "installed": true,
+  "daemonRunning": true,
+  "backendState": "NeedsLogin",
+  "connected": false,
+  "authUrl": "https://login.tailscale.com/a/g80668695b480364d",
+  "hostName": "runnervmm7ud1",
+  "dnsName": "",
+  "ipv4": "",
+  "ipv6": "",
+  "tailnet": "",
+  "version": "built in",
+  "keyExpiry": null,
+  "health": [
+    "Tailscale is starting. Please wait."
+  ],
+  "peers": [],
+  "message": "Sign in to connect AFIF-PBX to your tailnet",
+  "wantedName": "afif-pbx-ci",
+  "domain": "",
+  "hasApiToken": false,
+  "enabled": true,
+  "relayPorts": 0,
+  "relayErrors": [],
+  "loginInProgress": true,
+  "domainResolvesTo": "",
+  "domainOk": false,
+  "lastDnsUpdateUtc": null,
+  "lastDnsLog": []
+}
+No Tailscale/Wintun adapter in Windows — the engine is userspace only.
+Logout: Signed out and switched off.
+
+Rule Name:                            AFIF-PBX Phone System
+----------------------------------------------------------------------
+Enabled:                              Yes
+Direction:                            In
+Profiles:                             Domain,Private,Public
+Grouping:                             
+LocalIP:                              Any
+RemoteIP:                             LocalSubnet
+Protocol:                             Any
+Edge traversal:                       No
+Action:                               Allow
+Ok.
+Speech preview bytes: 46188
+20:37:39.263 [Information] AFIF-PBX: AFIF-PBX 2.0.13 starting (data: D:\a\_temp\afif-data)
+20:37:39.370 [Information] SIP: SIP server listening on 0.0.0.0:5060
+20:37:39.371 [Information] SIP: SIP server listening on 0.0.0.0:5160
+20:37:39.373 [Information] SIP: Secure network SIP 5060 → 127.0.0.1:51267
+20:37:39.374 [Information] SIP: Secure network SIP 5160 → 127.0.0.1:51268
+20:37:39.374 [Information] GSM: Discovered 0 dongle(s):
+20:37:40.344 [Information] AFIF-PBX: Firewall: AFIF-PBX open to the local network; secure network engine allowed
+20:37:40.386 [Information] AFIF-PBX: Web panel on http://localhost:8090/  — SIP on port 5060
+20:37:43.543 [Information] Tailscale: Secure network engine started (pid 4388)
+20:37:43.609 [Information] Tailscale: Secure network: tsnet running state path D:\a\_temp\afif-data\secure-network\tailscaled.state
+20:37:43.613 [Information] Tailscale: Secure network: tsnet starting with hostname "afif-pbx-ci", varRoot "D:\\a\\_temp\\afif-data\\secure-network"
+20:37:43.615 [Information] Tailscale: Secure network: LocalBackend state is NeedsLogin; running StartLoginInteractive...
+20:37:43.615 [Information] Tailscale: Secure network: afif-net ready (control 127.0.0.1:53304, afif-pbx-ci)
+**********************
+PowerShell transcript end
+End time: 20261114203749
+**********************
