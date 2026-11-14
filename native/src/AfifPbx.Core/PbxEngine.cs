@@ -227,6 +227,11 @@ public sealed class PbxEngine : IDisposable
 
     public async Task<bool> SendSmsAsync(string number, string text, string? extension = null)
     {
+        // RFC 3994 composing/typing notifications must never become stored SMS
+        // messages. Older clients forwarded them as XML and they appeared in chats.
+        if (text.Contains("isComposing", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("im-iscomposing", StringComparison.OrdinalIgnoreCase))
+            return true;
         // The destination is one of our own extensions, not a real phone number - there is no
         // SIM card involved, so deliver it straight to that extension's phone(s) (same path used
         // for a real incoming SMS) instead of handing it to the dongle, where it can only ever

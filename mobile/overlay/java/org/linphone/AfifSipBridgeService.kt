@@ -480,6 +480,10 @@ class AfifSipBridgeService : Service() {
 
     private fun onMessage(msg: Sip, remote: InetSocketAddress) {
         val to = uriUser(msg.first("To")) ?: ""
+        if (isComposing(msg.body)) {
+            respond(msg, 200, "OK")
+            return
+        }
         if (to.isNotBlank() && msg.body.isNotBlank()) {
             send(JSONObject().put("type", "sms").put("to", to).put("text", msg.body))
         }
@@ -487,6 +491,7 @@ class AfifSipBridgeService : Service() {
     }
 
     private fun localSms(from: String, text: String) {
+        if (isComposing(text)) return
         val ext = AfifTransport.extension(this)
         val contact = contacts[ext] ?: return
         val headers = mutableListOf(
@@ -577,6 +582,9 @@ class AfifSipBridgeService : Service() {
 }
 
 // ---------------------------------------------------------------- SIP utilities
+
+private fun isComposing(body: String): Boolean =
+    body.contains("isComposing", true) || body.contains("im-iscomposing", true)
 
 private data class Sip(
     val start: String,

@@ -959,6 +959,32 @@ edit(ui, "    </androidx.constraintlayout.widget.ConstraintLayout>\n\n</layout>"
      '            app:layout_constraintEnd_toEndOf="@id/afif_message_title" />\n\n'
      '        <androidx.appcompat.widget.AppCompatTextView\n'
      '            style="@style/settings_title_padding_style"\n'
+     '            android:id="@+id/afif_text_color_title"\n'
+     '            android:layout_width="0dp"\n'
+     '            android:layout_height="wrap_content"\n'
+     '            android:layout_marginTop="20dp"\n'
+     '            android:layout_marginStart="16dp"\n'
+     '            android:layout_marginEnd="16dp"\n'
+     '            android:text="Message text colour"\n'
+     '            app:layout_constraintTop_toBottomOf="@id/afif_message_spinner"\n'
+     '            app:layout_constraintStart_toStartOf="parent"\n'
+     '            app:layout_constraintEnd_toEndOf="parent"/>\n\n'
+     '        <androidx.appcompat.widget.AppCompatSpinner\n'
+     '            style="@style/default_text_style"\n'
+     '            android:id="@+id/afif_text_color_spinner"\n'
+     '            android:layout_width="0dp"\n'
+     '            android:layout_height="50dp"\n'
+     '            android:background="@drawable/edit_text_background"\n'
+     '            android:paddingStart="@dimen/spinner_start_padding"\n'
+     '            android:paddingEnd="@dimen/spinner_end_padding"\n'
+     '            android:overlapAnchor="false"\n'
+     '            android:spinnerMode="dropdown"\n'
+     '            android:popupBackground="@drawable/shape_squircle_white_background"\n'
+     '            app:layout_constraintTop_toBottomOf="@id/afif_text_color_title"\n'
+     '            app:layout_constraintStart_toStartOf="@id/afif_text_color_title"\n'
+     '            app:layout_constraintEnd_toEndOf="@id/afif_text_color_title" />\n\n'
+     '        <androidx.appcompat.widget.AppCompatTextView\n'
+     '            style="@style/settings_title_padding_style"\n'
      '            android:id="@+id/afif_voice_title"\n'
      '            android:layout_width="0dp"\n'
      '            android:layout_height="wrap_content"\n'
@@ -966,7 +992,7 @@ edit(ui, "    </androidx.constraintlayout.widget.ConstraintLayout>\n\n</layout>"
      '            android:layout_marginStart="16dp"\n'
      '            android:layout_marginEnd="16dp"\n'
      '            android:text="Voice changer"\n'
-     '            app:layout_constraintTop_toBottomOf="@id/afif_message_spinner"\n'
+     '            app:layout_constraintTop_toBottomOf="@id/afif_text_color_spinner"\n'
      '            app:layout_constraintStart_toStartOf="parent"\n'
      '            app:layout_constraintEnd_toEndOf="parent"/>\n\n'
      '        <androidx.appcompat.widget.AppCompatSpinner\n'
@@ -1056,6 +1082,17 @@ edit(settings_fragment, "        binding.viewModel = viewModel",
      "            }\n"
      "            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}\n"
      "        }\n"
+     "        val afifTextColorAdapter = android.widget.ArrayAdapter(\n"
+     "            requireContext(), R.layout.generic_dropdown_cell, org.linphone.AfifTheme.textColorLabels\n"
+     "        )\n"
+     "        binding.userInterfaceSettings.afifTextColorSpinner.adapter = afifTextColorAdapter\n"
+     "        binding.userInterfaceSettings.afifTextColorSpinner.setSelection(org.linphone.AfifTheme.textColorIndex(requireContext()))\n"
+     "        binding.userInterfaceSettings.afifTextColorSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {\n"
+     "            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {\n"
+     "                org.linphone.AfifTheme.setTextColorIndex(requireContext(), position)\n"
+     "            }\n"
+     "            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}\n"
+     "        }\n"
      "        val afifVoiceAdapter = android.widget.ArrayAdapter(\n"
      "            requireContext(), R.layout.generic_dropdown_cell, org.linphone.AfifVoiceEffect.effects\n"
      "        )\n"
@@ -1122,11 +1159,26 @@ edit(conversation, "        binding = ChatConversationFragmentBinding.inflate(la
      "        org.linphone.AfifTheme.applyChat(binding.root)")
 
 chat_adapter = os.path.join(MAIN, "java", "org", "linphone", "ui", "main", "chat", "adapter", "ConversationEventAdapter.kt")
+edit(chat_adapter, "    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {\n        val eventLog = getItem(position)\n",
+     "    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {\n"
+     "        val eventLog = getItem(position)\n"
+     "        if (!eventLog.isEvent) {\n"
+     "            val afifText = (eventLog.model as org.linphone.ui.main.chat.model.MessageModel).text\n"
+     "            if (afifText.contains(\"isComposing\", true) || afifText.contains(\"im-iscomposing\", true)) {\n"
+     "                holder.itemView.visibility = View.GONE\n"
+     "                return\n"
+     "            }\n"
+     "            holder.itemView.visibility = View.VISIBLE\n"
+     "        }\n")
 edit(chat_adapter, "        val viewHolder = IncomingBubbleViewHolder(binding)",
      "        val viewHolder = IncomingBubbleViewHolder(binding)\n"
-     "        org.linphone.AfifTheme.applyBubble(binding.bubble, false)")
+     "        org.linphone.AfifTheme.applyBubble(binding.bubble, false)\n"
+     "        binding.textContent.setTextColor(org.linphone.AfifTheme.textColor(binding.root.context))\n"
+     "        binding.dateTime.setTextColor(org.linphone.AfifTheme.textColor(binding.root.context) and 0xBFFFFFFF.toInt())")
 edit(chat_adapter, "        val viewHolder = OutgoingBubbleViewHolder(binding)",
      "        val viewHolder = OutgoingBubbleViewHolder(binding)\n"
-     "        org.linphone.AfifTheme.applyBubble(binding.bubble, true)")
+     "        org.linphone.AfifTheme.applyBubble(binding.bubble, true)\n"
+     "        binding.textContent.setTextColor(org.linphone.AfifTheme.textColor(binding.root.context))\n"
+     "        binding.dateTime.setTextColor(org.linphone.AfifTheme.textColor(binding.root.context) and 0xBFFFFFFF.toInt())")
 
 print("AFIF Phone overlay applied.")

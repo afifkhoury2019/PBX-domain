@@ -16,6 +16,7 @@ object AfifTheme {
     private const val PREFS = "afif_phone"
     private const val KEY = "visual_style_v1"
     private const val MESSAGE_KEY = "message_style_v1"
+    private const val TEXT_KEY = "message_text_color_v1"
 
     data class Style(
         val label: String,
@@ -48,6 +49,26 @@ object AfifTheme {
             .coerceIn(0, styles.size - 1)
 
     fun messageStyle(context: Context): Style = styles[messageIndex(context)]
+
+    val textColors = intArrayOf(
+        0xFFFFFFFF.toInt(), // White
+        0xFF111827.toInt(), // Near black
+        0xFFFFF4D6.toInt(), // Warm white
+        0xFFD1FAE5.toInt(), // Mint
+        0xFFFFD6E7.toInt()  // Rose
+    )
+    val textColorLabels = arrayOf("White", "Near black", "Warm white", "Mint", "Rose")
+
+    fun textColorIndex(context: Context): Int =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt(TEXT_KEY, 0).coerceIn(0, textColors.size - 1)
+
+    fun setTextColorIndex(context: Context, value: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt(TEXT_KEY, value.coerceIn(0, textColors.size - 1)).apply()
+    }
+
+    fun textColor(context: Context): Int = textColors[textColorIndex(context)]
 
     fun labels(): Array<String> = styles.map { it.label }.toTypedArray()
 
