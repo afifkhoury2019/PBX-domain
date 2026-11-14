@@ -1,0 +1,20 @@
+11-14 20:49:29.689  3621  3621 W Monkey  : args: [-p, com.afiftech.phone, -c, android.intent.category.LAUNCHER, 1]
+11-14 20:49:29.689  3621  3621 W Monkey  :  arg: "com.afiftech.phone"
+11-14 20:49:29.689  3621  3621 W Monkey  : data="com.afiftech.phone"
+11-14 20:49:30.519  3719  3719 W .afiftech.phone: Unexpected CPU variant for x86: x86_64.
+11-14 20:49:30.519  3719  3719 W .afiftech.phone: Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, tremont, kabylake, default
+11-14 20:49:30.524  3719  3719 E .afiftech.phone: Not starting debugger since process cannot load the jdwp agent.
+11-14 20:49:30.587  1545  3073 W libc    : Access denied finding property "ro.hardware.chipname"
+11-14 20:49:31.696   522   544 W ActivityTaskManager: Activity top resumed state loss timeout for ActivityRecord{e2a450a u0 com.afiftech.phone/org.linphone.ui.main.MainActivity t8}
+11-14 20:49:31.696   522   544 W ActivityTaskManager: Activity pause timeout for ActivityRecord{e2a450a u0 com.afiftech.phone/org.linphone.ui.main.MainActivity t8}
+11-14 20:49:32.274  3719  3719 W .afiftech.phone: Long monitor contention with owner Core Thread (3855) at void org.linphone.core.CoreImpl.addListener(org.linphone.core.CoreListener)(r8-map-id-a69fce5a04f8e940fc23819d8488b37e40d6421d8d562b935b3d421ae3d5d354:7) waiters=0 in org.linphone.core.MagicSearch org.linphone.core.CoreImpl.createMagicSearch() for 645ms
+11-14 20:49:35.648   522  2549 W InputManager-JNI: Input channel object '12d4e92 Splash Screen com.afiftech.phone (client)' was disposed without first being removed with the input manager!
+11-14 20:49:35.698   522  2127 W InputManager-JNI: Input channel object '2f46eda com.afiftech.phone/org.linphone.ui.main.MainActivity (client)' was disposed without first being removed with the input manager!
+11-14 20:49:51.264  1545  4647 W libc    : Access denied finding property "ro.hardware.chipname"
+11-14 20:49:53.957  3719  3775 W .afiftech.phone: Cleared Reference was only reachable from finalizer (only reported once)
+11-14 20:49:55.090   522  1632 W InputManager-JNI: Input channel object 'e78f74d com.afiftech.phone/org.linphone.ui.assistant.AssistantActivity (client)' was disposed without first being removed with the input manager!
+11-14 20:50:09.694  3719  3719 E .afiftech.phone: Invalid resource ID 0x00000000.
+11-14 20:50:12.608  5452  5598 W libc    : Access denied finding property "ro.hardware.chipname"
+11-14 20:50:20.399  5452  5702 W libc    : Access denied finding property "ro.hardware.chipname"
+11-14 20:50:24.191   522  1103 E AppOps  : Bad call made by uid 10097. Package "com.afiftech.phone" does not belong to uid 10097.
+11-14 20:50:24.191   522  1103 E AppOps  : java.lang.SecurityException: Specified package "com.afiftech.phone" under uid 10097 but it is not
