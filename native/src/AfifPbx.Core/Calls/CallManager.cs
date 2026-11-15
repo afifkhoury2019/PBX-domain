@@ -408,7 +408,7 @@ public sealed class CallManager
         // Don't start the app's local ringback until the GSM network actually starts
         // alerting. Sending 180 immediately produced several local ring tones before
         // the real network ringback/announcement began.
-        await Task.WhenAny(gsm.AlertedTask, gsm.EndedTask, caller.EndedTask, Task.Delay(8_000)).ConfigureAwait(false);
+        await Task.WhenAny(gsm.AlertedTask, gsm.EndedTask, caller.EndedTask, Task.Delay(1_500)).ConfigureAwait(false);
         if (!caller.IsEnded && gsm.State == LegState.Ringing) caller.SendRinging();
         await Task.WhenAny(gsm.AnsweredTask, caller.EndedTask, Task.Delay(75_000)).ConfigureAwait(false);
         if (caller.IsEnded) { gsm.Hangup(); return; }
