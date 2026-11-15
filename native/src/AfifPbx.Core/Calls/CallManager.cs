@@ -414,9 +414,16 @@ public sealed class CallManager
             _log.LogInformation("Call {Call}: GSM leg {Gsm} to {Number} did not answer ({Reason})", call.Id, gsm, number, reason);
             gsm.Hangup();
             call.Disposition = reason.Contains("busy") ? "BUSY" : "NO ANSWER";
-            // The E303 doesn't expose the operator's in-band announcement when the
-            // prepaid line has no balance; the call stays in alerting then ^CEND
-            // cause 31. Play an equivalent prompt instead of dropping into silence.
+            // If the modem exposed alerting-phase audio, that is the operator's own
+            // announcement (e.g. "not enough balance"). Play that PCM to the caller.
+            var early = gsm.TakeEarlyAudio();
+            if (early.Count > 0)
+            {
+                await PlayCapturedAsync(caller, early).ConfigureAwait(false);
+                return;
+            }
+            // No early audio from the GSM network; play an equivalent PBX prompt
+            // instead of dropping into silence.
             string prompt = reason.Contains("busy")
                 ? "The mobile line is busy. Please try again later."
                 : "The mobile call could not be completed. The GSM line may have insufficient balance, or the other side did not answer.";
@@ -425,6 +432,21 @@ public sealed class CallManager
         }
         if (!await caller.AnswerAsync().ConfigureAwait(false)) { gsm.Hangup(); return; }
         await ConnectAsync(call, caller, gsm).ConfigureAwait(false);
+    }
+
+    private async Task PlayCapturedAsync(CallLeg caller, List<short[]> frames)
+    {
+        if (await caller.AnswerAsync().ConfigureAwait(false))
+        {
+            await _media.PauseAsync(caller, 50, false).ConfigureAwait(false);
+            foreach (var frame in frames)
+            {
+                if (caller.IsEnded) break;
+                caller.Write(frame);
+                await Task.Delay(20).ConfigureAwait(false);
+            }
+        }
+        caller.Hangup("unavailable");
     }
 
     private async Task SayAndHangup(CallLeg caller, string text)

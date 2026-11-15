@@ -47,6 +47,7 @@ public sealed class HuaweiModem : IDisposable
     private bool _announced;
     private bool _rxLogged;
     private bool _txLogged;
+    private bool _voicePath;
     private Task? _supervisor;
     private Task? _callSupervisor;
     private int _noCallPolls;
@@ -335,7 +336,16 @@ public sealed class HuaweiModem : IDisposable
                 if (_callState == "incoming") AnnounceIncoming();
             }
             else if (line.StartsWith("^ORIG:")) { _log.LogInformation("GSM call: dialing ({Line})", line); SetCall("dialing"); }
-            else if (line.StartsWith("^CONF:")) { _log.LogInformation("GSM call: alerting (ringing at the far end)"); SetCall("alerting"); FireCallState("alerting", ""); }
+            else if (line.StartsWith("^CONF:"))
+            {
+                _log.LogInformation("GSM call: alerting (ringing at the far end)");
+                SetCall("alerting");
+                FireCallState("alerting", "");
+                // Some networks (including prepaid "no balance" announcements) put
+                // audio in the alerting phase. Try to open the PCM path early so
+                // that announcement can be relayed instead of being discarded.
+                _ = EnableVoicePathAsync();
+            }
             else if (line.StartsWith("^CONN:"))
             {
                 _log.LogInformation("GSM call: answered");
@@ -395,6 +405,7 @@ public sealed class HuaweiModem : IDisposable
     {
         if (_callState == "idle") return;
         SetCall("idle");
+        _voicePath = false;
         _announced = false;
         _rxLogged = false;
         _txLogged = false;
@@ -445,6 +456,7 @@ public sealed class HuaweiModem : IDisposable
         var at = _at;
         if (at is null) return;
         var r = await at.SendAsync("AT^DDSETEX=2", 3000).ConfigureAwait(false);
+        _voicePath = r.Ok;
         if (!r.Ok) _log.LogWarning("AT^DDSETEX=2 failed: {Final}", r.Final);
         else _log.LogInformation("GSM voice path enabled (DDSETEX=2)");
     }
@@ -503,7 +515,11 @@ public sealed class HuaweiModem : IDisposable
             {
                 int n = audio.Read(buf, 0, buf.Length);
                 if (n <= 0) { Thread.Sleep(5); continue; }
-                if (_callState != "active") { pending.Clear(); continue; }
+                if (_callState is not ("active" or "alerting") || !_voicePath)
+                {
+                    pending.Clear();
+                    continue;
+                }
                 pending.AddRange(buf.AsSpan(0, n).ToArray());
                 while (pending.Count >= Audio.FrameBytes)
                 {

@@ -9,6 +9,8 @@ public sealed class GsmLeg : CallLeg
     private readonly HuaweiModem _modem;
     private readonly DtmfDetector _dtmf = new();
     private readonly bool _inbound;
+    private readonly object _earlyLock = new();
+    private readonly List<short[]> _earlyAudio = new();
 
     public override string Kind => "gsm";
 
@@ -39,9 +41,33 @@ public sealed class GsmLeg : CallLeg
 
     private void OnAudio(short[] frame)
     {
-        if (State != LegState.Answered) return;
-        Inbound.Push(frame);
-        _dtmf.Process(frame);
+        if (State == LegState.Answered)
+        {
+            Inbound.Push(frame);
+            _dtmf.Process(frame);
+            return;
+        }
+        // Alerting-phase audio can be the operator's "insufficient balance"
+        // announcement. Keep it so it can be played to the SIP caller if the GSM
+        // call never reaches ^CONN.
+        if (State == LegState.Ringing && !_inbound)
+        {
+            lock (_earlyLock)
+            {
+                if (_earlyAudio.Count < 750) _earlyAudio.Add((short[])frame.Clone());
+            }
+        }
+    }
+
+    /// <summary>PCM captured from the GSM line before the call was answered.</summary>
+    public List<short[]> TakeEarlyAudio()
+    {
+        lock (_earlyLock)
+        {
+            var copy = new List<short[]>(_earlyAudio);
+            _earlyAudio.Clear();
+            return copy;
+        }
     }
 
     private void OnCallState(string state, string detail)
