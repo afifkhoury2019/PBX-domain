@@ -170,6 +170,14 @@ public sealed class PbxEngine : IDisposable
 
     private void OnSms(IncomingSms sms, DongleRuntime? dongle)
     {
+        // Self-addressed SMS can come back from the modem as a raw PDU/status
+        // report (empty sender, binary body); it is not a real chat message.
+        if (string.IsNullOrWhiteSpace(sms.Sender) || LooksBinary(sms.Text))
+        {
+            _logs.CreateLogger("GSM").LogWarning(
+                "Ignored binary/empty-sender SMS ({Length} chars)", sms.Text.Length);
+            return;
+        }
         long id = Db.AddSms("in", sms.Sender, sms.Text, "received");
         var msg = Db.Sms(1).FirstOrDefault(m => m.Id == id);
         foreach (var ext in SmsTargets(dongle)) Db.AddSmsPending(id, ext);
@@ -225,6 +233,22 @@ public sealed class PbxEngine : IDisposable
     private static string CleanNumber(string n) =>
         new string(n.Trim().Where(c => char.IsDigit(c) || c == '+' || c == '*' || c == '#').ToArray());
 
+    private static bool SameNumber(string? a, string? b)
+    {
+        if (string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b)) return false;
+        string da = new(a.Where(char.IsDigit).ToArray());
+        string db = new(b.Where(char.IsDigit).ToArray());
+        if (da.Length == 0 || db.Length == 0) return false;
+        return da == db || da.EndsWith(db, StringComparison.Ordinal) || db.EndsWith(da, StringComparison.Ordinal);
+    }
+
+    private static bool LooksBinary(string text)
+    {
+        if (text.Length == 0) return true;
+        int bad = text.Count(c => c == '\uFFFD' || (c < ' ' && c != '\r' && c != '\n' && c != '\t'));
+        return bad > 0 && bad * 8 >= text.Length;
+    }
+
     public async Task<bool> SendSmsAsync(string number, string text, string? extension = null)
     {
         // RFC 3994 composing/typing notifications must never become stored SMS
@@ -232,6 +256,17 @@ public sealed class PbxEngine : IDisposable
         if (text.Contains("isComposing", StringComparison.OrdinalIgnoreCase) ||
             text.Contains("im-iscomposing", StringComparison.OrdinalIgnoreCase))
             return true;
+        // Sending to the SIM's own number makes the GSM network deliver the SMS back
+        // to the same dongle as a binary/status PDU. Treat it as a local saved message
+        // instead of putting it on the GSM network at all.
+        var ownNumber = Dongles.Select(d => d.Modem.Status?.OwnNumber)
+            .FirstOrDefault(n => !string.IsNullOrWhiteSpace(n));
+        if (!string.IsNullOrWhiteSpace(extension) && SameNumber(number, ownNumber))
+        {
+            long selfId = Db.AddSms("out", number, text, "delivered");
+            Db.SetSmsStatus(selfId, "delivered");
+            return true;
+        }
         // The destination is one of our own extensions, not a real phone number - there is no
         // SIM card involved, so deliver it straight to that extension's phone(s) (same path used
         // for a real incoming SMS) instead of handing it to the dongle, where it can only ever

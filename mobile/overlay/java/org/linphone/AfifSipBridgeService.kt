@@ -491,7 +491,7 @@ class AfifSipBridgeService : Service() {
     }
 
     private fun localSms(from: String, text: String) {
-        if (isComposing(text)) return
+        if (isComposing(text) || text.contains('\uFFFD')) return
         val ext = AfifTransport.extension(this)
         val contact = contacts[ext] ?: return
         val headers = mutableListOf(
