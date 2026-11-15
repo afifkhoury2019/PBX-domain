@@ -414,7 +414,13 @@ public sealed class CallManager
             _log.LogInformation("Call {Call}: GSM leg {Gsm} to {Number} did not answer ({Reason})", call.Id, gsm, number, reason);
             gsm.Hangup();
             call.Disposition = reason.Contains("busy") ? "BUSY" : "NO ANSWER";
-            caller.Hangup(reason.Contains("busy") ? "busy" : $"unavailable ({reason})");
+            // The E303 doesn't expose the operator's in-band announcement when the
+            // prepaid line has no balance; the call stays in alerting then ^CEND
+            // cause 31. Play an equivalent prompt instead of dropping into silence.
+            string prompt = reason.Contains("busy")
+                ? "The mobile line is busy. Please try again later."
+                : "The mobile call could not be completed. The GSM line may have insufficient balance, or the other side did not answer.";
+            await SayAndHangup(caller, prompt).ConfigureAwait(false);
             return;
         }
         if (!await caller.AnswerAsync().ConfigureAwait(false)) { gsm.Hangup(); return; }
