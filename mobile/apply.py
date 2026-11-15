@@ -116,6 +116,11 @@ edit(gb, 'output.outputFileName = "linphone-android-${variant.buildType.name}-$g
      'output.outputFileName = "AFIF-Phone-${variant.buildType.name}.apk"')
 edit(gb, 'abiFilters += listOf("armeabi-v7a", "arm64-v8a")',
      'abiFilters += providers.gradleProperty("afifAbis").getOrElse("armeabi-v7a,arm64-v8a").split(",")')
+edit(gb, 'keyPassword = keystoreProperties["keyPassword"] as String',
+     'keyPassword = keystoreProperties["keyPassword"] as String\n'
+     '                enableV1Signing = true\n'
+     '                enableV2Signing = true\n'
+     '                enableV3Signing = true')
 edit(gb, "dependencies {", 'dependencies {\n    implementation(project(":tailscale"))\n    implementation("com.squareup.okhttp3:okhttp:4.12.0")', count=1)
 gs = os.path.join(APP, "google-services.json")
 if os.path.exists(gs):

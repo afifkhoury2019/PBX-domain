@@ -85,6 +85,14 @@ jobs:
       - name: Apply AFIF branding and the Tailscale module
         run: python3 afif/mobile/apply.py --linphone linphone --tailscale tailscale
 
+      - name: Restore AFIF signing key
+        uses: actions/cache@v4
+        with:
+          path: |
+            linphone/app/afif-phone.jks
+            linphone/keystore.properties
+          key: afif-phone-keystore-v1
+
       - name: Signing key
         env:
           KEYSTORE_B64: ${{ secrets.AFIF_PHONE_KEYSTORE }}
@@ -94,14 +102,17 @@ jobs:
           if [ -n "$KEYSTORE_B64" ]; then
             echo "$KEYSTORE_B64" | base64 -d > app/afif-phone.jks
             PW="$KEY_PASSWORD"
+            printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=afif-phone\nstoreFile=afif-phone.jks\n' "$PW" "$PW" > keystore.properties
             echo "Signing with the AFIF Phone release key"
+          elif [ -s app/afif-phone.jks ] && [ -s keystore.properties ]; then
+            echo "Reusing the cached AFIF Phone signing key"
           else
             PW=$(openssl rand -hex 16)
             keytool -genkeypair -keystore app/afif-phone.jks -storepass "$PW" -keypass "$PW" -alias afif-phone \
               -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=AFIF Phone, O=AFIF-TECH" > /dev/null
-            echo "::warning::No AFIF_PHONE_KEYSTORE secret - signed with a one-off key (updates will need uninstall first)"
+            printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=afif-phone\nstoreFile=afif-phone.jks\n' "$PW" "$PW" > keystore.properties
+            echo "::warning::No AFIF_PHONE_KEYSTORE secret - new key; it will be cached for future builds"
           fi
-          printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=afif-phone\nstoreFile=afif-phone.jks\n' "$PW" "$PW" > keystore.properties
 
       - uses: gradle/actions/setup-gradle@v4
 
