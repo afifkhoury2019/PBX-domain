@@ -403,9 +403,13 @@ public sealed class CallManager
         if (!string.IsNullOrEmpty(dongle.Config.StripPrefix) &&
             number.StartsWith(dongle.Config.StripPrefix, StringComparison.Ordinal))
             number = number[dongle.Config.StripPrefix.Length..];
-        caller.SendRinging();
         var gsm = GsmLeg.Dial(dongle.Modem, number);
         lock (call.Legs) call.Legs.Add(gsm);
+        // Don't start the app's local ringback until the GSM network actually starts
+        // alerting. Sending 180 immediately produced several local ring tones before
+        // the real network ringback/announcement began.
+        await Task.WhenAny(gsm.AlertedTask, gsm.EndedTask, caller.EndedTask, Task.Delay(8_000)).ConfigureAwait(false);
+        if (!caller.IsEnded && gsm.State == LegState.Ringing) caller.SendRinging();
         await Task.WhenAny(gsm.AnsweredTask, caller.EndedTask, Task.Delay(75_000)).ConfigureAwait(false);
         if (caller.IsEnded) { gsm.Hangup(); return; }
         if (gsm.State != LegState.Answered)

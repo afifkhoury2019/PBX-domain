@@ -11,6 +11,8 @@ public sealed class GsmLeg : CallLeg
     private readonly bool _inbound;
     private readonly object _earlyLock = new();
     private readonly List<short[]> _earlyAudio = new();
+    private readonly TaskCompletionSource<bool> _alerted =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public override string Kind => "gsm";
 
@@ -60,6 +62,9 @@ public sealed class GsmLeg : CallLeg
     }
 
     /// <summary>PCM captured from the GSM line before the call was answered.</summary>
+    /// <summary>Completes when the GSM network starts alerting, or false if it ends first.</summary>
+    public Task<bool> AlertedTask => _alerted.Task;
+
     public List<short[]> TakeEarlyAudio()
     {
         lock (_earlyLock)
@@ -72,8 +77,9 @@ public sealed class GsmLeg : CallLeg
 
     private void OnCallState(string state, string detail)
     {
-        if (state == "answered" && !_inbound) MarkAnswered();
-        else if (state == "ended") End(detail);
+        if (state == "alerting") _alerted.TrySetResult(true);
+        else if (state == "answered" && !_inbound) { _alerted.TrySetResult(true); MarkAnswered(); }
+        else if (state == "ended") { _alerted.TrySetResult(false); End(detail); }
     }
 
     public override async Task<bool> AnswerAsync()
