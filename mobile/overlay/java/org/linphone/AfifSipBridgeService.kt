@@ -497,7 +497,7 @@ class AfifSipBridgeService : Service() {
         val headers = mutableListOf(
             "Via" to "SIP/2.0/UDP 127.0.0.1:5070;branch=z9hG4bK${randomTag()}",
             "Max-Forwards" to "70",
-            "From" to "<sip:$from@$HOST>;tag=${randomTag()}",
+            "From" to "<sip:$from@${AfifLocalSip.HOST}>;tag=${randomTag()}",
             "To" to "<${contact.uri}>",
             "Call-ID" to "${System.currentTimeMillis()}@afif",
             "CSeq" to "1 MESSAGE",
