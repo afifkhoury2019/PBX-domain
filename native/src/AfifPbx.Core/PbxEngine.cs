@@ -254,7 +254,9 @@ public sealed class PbxEngine : IDisposable
         // RFC 3994 composing/typing notifications must never become stored SMS
         // messages. Older clients forwarded them as XML and they appeared in chats.
         if (text.Contains("isComposing", StringComparison.OrdinalIgnoreCase) ||
-            text.Contains("im-iscomposing", StringComparison.OrdinalIgnoreCase))
+            text.Contains("im-iscomposing", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("<imdn", StringComparison.OrdinalIgnoreCase) ||
+            text.TrimStart().StartsWith("<?xml", StringComparison.OrdinalIgnoreCase))
             return true;
         // Sending to the SIM's own number makes the GSM network deliver the SMS back
         // to the same dongle as a binary/status PDU. Treat it as a local saved message

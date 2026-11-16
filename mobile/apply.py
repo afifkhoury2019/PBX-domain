@@ -1169,7 +1169,7 @@ edit(chat_adapter, "    override fun onBindViewHolder(holder: RecyclerView.ViewH
      "        val eventLog = getItem(position)\n"
      "        if (!eventLog.isEvent) {\n"
      "            val afifText = (eventLog.model as org.linphone.ui.main.chat.model.MessageModel).getRawTextContent()\n"
-     "            if (afifText.contains(\"isComposing\", true) || afifText.contains(\"im-iscomposing\", true) || afifText.contains(\"\\uFFFD\")) {\n"
+     "            if (afifText.contains(\"isComposing\", true) || afifText.contains(\"im-iscomposing\", true) || afifText.contains(\"<imdn\", true) || afifText.contains(\"\\uFFFD\")) {\n"
      "                holder.itemView.visibility = View.GONE\n"
      "                return\n"
      "            }\n"

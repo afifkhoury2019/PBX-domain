@@ -507,7 +507,7 @@ class AfifSipBridgeService : Service() {
     private fun onMessage(msg: Sip, remote: InetSocketAddress) {
         val to = uriUser(msg.first("To")) ?: ""
         val body = sipBody(msg)
-        if (isComposing(body) || body.contains('\uFFFD')) {
+        if (isProtocolMessage(body) || body.contains('\uFFFD')) {
             respond(msg, 200, "OK")
             return
         }
@@ -518,7 +518,7 @@ class AfifSipBridgeService : Service() {
     }
 
     private fun localSms(from: String, text: String) {
-        if (isComposing(text) || text.contains('\uFFFD')) return
+        if (isProtocolMessage(text) || text.contains('\uFFFD')) return
         val ext = AfifTransport.extension(this)
         val contact = contacts[ext] ?: return
         val headers = mutableListOf(
@@ -610,8 +610,14 @@ class AfifSipBridgeService : Service() {
 
 // ---------------------------------------------------------------- SIP utilities
 
-private fun isComposing(body: String): Boolean =
-    body.contains("isComposing", true) || body.contains("im-iscomposing", true)
+private fun isProtocolMessage(body: String): Boolean {
+    val t = body.trimStart()
+    return t.startsWith("<?xml") ||
+        t.startsWith("<imdn") ||
+        t.contains("<imdn", true) ||
+        t.contains("isComposing", true) ||
+        t.contains("im-iscomposing", true)
+}
 
 private data class Sip(
     val start: String,
