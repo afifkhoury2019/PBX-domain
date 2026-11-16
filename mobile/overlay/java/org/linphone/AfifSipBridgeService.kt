@@ -34,6 +34,8 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import java.io.ByteArrayOutputStream
+import java.util.zip.Inflater
 import kotlin.random.Random
 
 class AfifSipBridgeService : Service() {
@@ -168,7 +170,7 @@ class AfifSipBridgeService : Service() {
                     try {
                         val p = DatagramPacket(buf, buf.size)
                         s.receive(p)
-                        val text = String(p.data, 0, p.length, Charsets.UTF_8)
+                        val text = String(p.data, 0, p.length, Charsets.ISO_8859_1)
                         onSip(text, InetSocketAddress(p.address, p.port))
                     } catch (_: Throwable) { }
                 }
@@ -478,14 +480,39 @@ class AfifSipBridgeService : Service() {
 
     // ------------------------------------------------------------ SMS
 
+    private fun sipBody(msg: Sip): String {
+        val raw = msg.body.toByteArray(Charsets.ISO_8859_1)
+        val enc = msg.first("Content-Encoding").orEmpty().lowercase()
+        val zlib = raw.size > 2 && raw[0] == 0x78.toByte() &&
+            ((raw[0].toInt() and 0xFF) * 256 + (raw[1].toInt() and 0xFF)) % 31 == 0
+        if (enc.contains("deflate") || zlib) {
+            try {
+                val inflater = Inflater()
+                inflater.setInput(raw)
+                val out = ByteArrayOutputStream()
+                val buf = ByteArray(4096)
+                while (!inflater.finished()) {
+                    val n = inflater.inflate(buf)
+                    if (n == 0) break
+                    out.write(buf, 0, n)
+                }
+                inflater.end()
+                return String(out.toByteArray(), Charsets.UTF_8)
+            } catch (_: Throwable) {
+            }
+        }
+        return String(raw, Charsets.UTF_8)
+    }
+
     private fun onMessage(msg: Sip, remote: InetSocketAddress) {
         val to = uriUser(msg.first("To")) ?: ""
-        if (isComposing(msg.body)) {
+        val body = sipBody(msg)
+        if (isComposing(body) || body.contains('\uFFFD')) {
             respond(msg, 200, "OK")
             return
         }
-        if (to.isNotBlank() && msg.body.isNotBlank()) {
-            send(JSONObject().put("type", "sms").put("to", to).put("text", msg.body))
+        if (to.isNotBlank() && body.isNotBlank()) {
+            send(JSONObject().put("type", "sms").put("to", to).put("text", body))
         }
         respond(msg, 200, "OK")
     }

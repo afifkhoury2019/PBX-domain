@@ -13,6 +13,7 @@ public static class SmsPdu
     private const string Gsm7Basic =
         "@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞ\u001bÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?" +
         "¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà";
+    private const string Gsm7ExtChars = "^{}\\[~]|€";
     private static readonly byte[] Gsm7ExtCodes = { 0x14, 0x28, 0x29, 0x2F, 0x3C, 0x3D, 0x3E, 0x40, 0x65 };
     private static readonly Random Rnd = new();
 
