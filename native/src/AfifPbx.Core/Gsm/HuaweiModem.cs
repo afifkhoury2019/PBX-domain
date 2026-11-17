@@ -582,6 +582,10 @@ public sealed class HuaweiModem : IDisposable
         try
         {
             var r = await at.SendAsync($"AT+CUSD=1,\"{code}\",15", 10000).ConfigureAwait(false);
+            // A +CUSD line that belongs to this command is captured in r.Lines by
+            // AtChannel instead of being raised as unsolicited, so check it first.
+            var captured = r.Line("+CUSD");
+            if (captured is not null) return DecodeUssd(captured);
             if (!r.Ok) return null;
             var done = await Task.WhenAny(tcs.Task, Task.Delay(20000)).ConfigureAwait(false);
             return done == tcs.Task ? tcs.Task.Result : null;

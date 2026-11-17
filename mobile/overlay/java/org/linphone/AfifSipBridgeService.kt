@@ -42,6 +42,7 @@ class AfifSipBridgeService : Service() {
     companion object {
         const val ACTION_START = "org.linphone.AFIF_SIP_BRIDGE_START"
         const val ACTION_STOP = "org.linphone.AFIF_SIP_BRIDGE_STOP"
+        const val ACTION_USSD = "org.linphone.AFIF_SIP_BRIDGE_USSD"
 
         @Volatile var connected = false
         @Volatile var lastError = ""
@@ -84,6 +85,14 @@ class AfifSipBridgeService : Service() {
 
         fun stop(context: Context) {
             context.startService(Intent(context, AfifSipBridgeService::class.java).setAction(ACTION_STOP))
+        }
+
+        fun requestUssd(context: Context, code: String) {
+            ensureSipBound()
+            val i = Intent(context, AfifSipBridgeService::class.java)
+                .setAction(ACTION_USSD)
+                .putExtra("code", code)
+            if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(i) else context.startService(i)
         }
     }
 
@@ -134,6 +143,16 @@ class AfifSipBridgeService : Service() {
                 cleanup()
                 stopForeground(true)
                 stopSelf()
+            }
+            ACTION_USSD -> {
+                running = true
+                startForeground(1201, note("Checking GSM USSD…"))
+                if (sip == null) startSip()
+                if (ws == null) connect()
+                val code = intent.getStringExtra("code") ?: "*116#"
+                main.postDelayed({
+                    send(JSONObject().put("type", "ussd").put("code", code))
+                }, 1200)
             }
         }
         return START_STICKY

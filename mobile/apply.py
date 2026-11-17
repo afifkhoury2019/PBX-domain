@@ -1049,6 +1049,15 @@ edit(ui, "    </androidx.constraintlayout.widget.ConstraintLayout>\n\n</layout>"
      '            app:layout_constraintTop_toBottomOf="@id/afif_connection_spinner"\n'
      '            app:layout_constraintStart_toStartOf="@id/afif_connection_title"\n'
      '            app:layout_constraintEnd_toEndOf="@id/afif_connection_title" />\n\n'
+     '        <Button\n'
+     '            android:id="@+id/afif_ussd_button"\n'
+     '            android:layout_width="0dp"\n'
+     '            android:layout_height="50dp"\n'
+     '            android:layout_marginTop="10dp"\n'
+     '            android:text="Check GSM credit (*116#)"\n'
+     '            app:layout_constraintTop_toBottomOf="@id/afif_domain_dial"\n'
+     '            app:layout_constraintStart_toStartOf="@id/afif_connection_title"\n'
+     '            app:layout_constraintEnd_toEndOf="@id/afif_connection_title" />\n\n'
      '    </androidx.constraintlayout.widget.ConstraintLayout>\n\n</layout>')
 
 settings_fragment = os.path.join(MAIN, "java", "org", "linphone", "ui", "main", "settings", "fragment", "SettingsFragment.kt")
@@ -1122,6 +1131,10 @@ edit(settings_fragment, "        binding.viewModel = viewModel",
      "        }\n"
      "        binding.userInterfaceSettings.afifDomainDial.setOnClickListener {\n"
      "            startActivity(android.content.Intent(requireContext(), org.linphone.AfifDomainDialActivity::class.java))\n"
+     "        }\n"
+     "        binding.userInterfaceSettings.afifUssdButton.setOnClickListener {\n"
+     "            org.linphone.AfifSipBridgeService.requestUssd(requireContext(), \"*116#\")\n"
+     "            android.widget.Toast.makeText(requireContext(), \"Sending *116# to the GSM line…\", android.widget.Toast.LENGTH_SHORT).show()\n"
      "        }")
 
 call_activity = os.path.join(MAIN, "java", "org", "linphone", "ui", "call", "CallActivity.kt")
