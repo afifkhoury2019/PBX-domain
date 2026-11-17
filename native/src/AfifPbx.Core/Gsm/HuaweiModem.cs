@@ -483,8 +483,18 @@ public sealed class HuaweiModem : IDisposable
         EndCall("local hangup");
     }
 
-    public Task SendDtmfAsync(char digit) =>
-        _at?.SendAsync($"AT^DTMF=1,{digit}") ?? Task.FromResult(new AtResult(false, "", Array.Empty<string>()));
+    public async Task SendDtmfAsync(char digit)
+    {
+        var at = _at;
+        if (at is null) return;
+        var r = await at.SendAsync($"AT^DTMF=1,{digit}", 2500).ConfigureAwait(false);
+        if (!r.Ok)
+        {
+            // Some Huawei firmware builds expose VTS instead of ^DTMF.
+            var v = await at.SendAsync($"AT+VTS=\"{digit}\"", 2500).ConfigureAwait(false);
+            if (!v.Ok) _log.LogWarning("DTMF {Digit} failed: ^DTMF={A}, VTS={B}", digit, r.Final, v.Final);
+        }
+    }
 
     /// <summary>Send a 20 ms frame of PCM to the network side of the active call.</summary>
     public void WriteAudio(short[] frame)
