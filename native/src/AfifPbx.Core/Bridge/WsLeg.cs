@@ -54,6 +54,9 @@ public sealed class WsLeg : CallLeg
     /// message for this leg - the WebSocket equivalent of a SIP 200 OK.</summary>
     public void MarkAnsweredByPhone() => MarkAnswered();
 
+    /// <summary>Keypad digit sent by the phone over its control WebSocket.</summary>
+    public void ReceiveDtmf(char digit) => OnDigit(digit);
+
     /// <summary>Tell the phone the PBX side answered an outbound call, and mark this leg answered so
     /// PCM frames start flowing in both directions.</summary>
     public void NotifyAnswered()

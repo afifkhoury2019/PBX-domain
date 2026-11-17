@@ -194,6 +194,7 @@ class AfifSipBridgeService : Service() {
             msg.start.startsWith("ACK") -> {}
             msg.start.startsWith("BYE") -> onBye(msg)
             msg.start.startsWith("CANCEL") -> onCancel(msg)
+            msg.start.startsWith("INFO") -> onInfo(msg)
             msg.start.startsWith("MESSAGE") -> onMessage(msg, remote)
             msg.start.startsWith("OPTIONS") -> respond(msg, 200, "OK")
         }
@@ -220,7 +221,16 @@ class AfifSipBridgeService : Service() {
     private fun onInvite(req: Sip, remote: InetSocketAddress) {
         val callId = req.first("Call-ID") ?: return
         if (dialogs.containsKey(callId)) { respond(req, 486, "Busy Here"); return }
-        val number = uriUser(req.first("To")) ?: uriUser(req.start) ?: ""
+        val rawNumber = uriUser(req.first("To")) ?: uriUser(req.start) ?: ""
+        val number = try { java.net.URLDecoder.decode(rawNumber, "UTF-8") } catch (_: Throwable) { rawNumber }
+        // *116# and similar GSM service codes are USSD, not calls. Send them to the
+        // dongle and end the local call immediately; the result comes back as a chat.
+        if (number.matches(Regex("^\\*[0-9*#]+#$"))) {
+            Log.i("AFIF-BRIDGE", "USSD request $number")
+            send(JSONObject().put("type", "ussd").put("code", number))
+            respond(req, 486, "Busy Here", toTag = randomTag())
+            return
+        }
         val d = Dialog(callId, false, number, remote, randomTag(), tagOf(req.first("From")), req)
         dialogs[callId] = d
         Log.i("AFIF-BRIDGE", "INVITE $callId number=$number sdp=${req.body.replace("\r\n", "|")}")
@@ -338,6 +348,7 @@ class AfifSipBridgeService : Service() {
                 "answered" -> outgoingAnswered()
                 "hangup" -> remoteHangup()
                 "sms" -> localSms(o.optString("from"), o.optString("text"))
+                "ussd-result" -> localSms("GSM", o.optString("text"))
             }
         } catch (_: Throwable) { }
     }
@@ -401,6 +412,7 @@ class AfifSipBridgeService : Service() {
 
     private fun startRtp(d: Dialog, sdp: Sdp) {
         val rtp = d.rtp ?: Rtp(0).also { d.rtp = it }
+        rtp.onDtmf = { digit -> send(JSONObject().put("type", "dtmf").put("digit", digit.toString())) }
         rtp.start(InetAddress.getByName("127.0.0.1"), sdp.port, sdp.payloadType) { pcm ->
             ws?.send(ByteString.of(*pcm))
         }
@@ -513,6 +525,17 @@ class AfifSipBridgeService : Service() {
         }
         if (to.isNotBlank() && body.isNotBlank()) {
             send(JSONObject().put("type", "sms").put("to", to).put("text", body))
+        }
+        respond(msg, 200, "OK")
+    }
+
+    private fun onInfo(msg: Sip) {
+        val body = sipBody(msg)
+        val digit = Regex("Signal=([0-9*#])").find(body)?.groupValues?.getOrNull(1)
+            ?: Regex("^\\s*([0-9*#])\\s*$").find(body)?.groupValues?.getOrNull(1)
+        if (!digit.isNullOrEmpty()) {
+            send(JSONObject().put("type", "dtmf").put("digit", digit))
+            Log.i("AFIF-BRIDGE", "DTMF -> GSM: $digit")
         }
         respond(msg, 200, "OK")
     }
@@ -713,6 +736,8 @@ private class Rtp(private val requestedPort: Int) {
     private var listener: ((ByteArray) -> Unit)? = null
     private var thread: Thread? = null
     private var loggedFirst = false
+    var onDtmf: ((Char) -> Unit)? = null
+    private var lastDtmfTs = -1
     val port: Int get() = socket?.localPort ?: requestedPort
 
     fun start(host: InetAddress, remotePort: Int, pt: Int, onPcm: (ByteArray) -> Unit) {
@@ -757,6 +782,20 @@ private class Rtp(private val requestedPort: Int) {
         if (!loggedFirst) {
             loggedFirst = true
             Log.i("AFIF-BRIDGE", "RTP first packet pt=$pt bytes=${packet.size} from=$remote")
+        }
+        if (pt == 101 && packet.size >= 16) {
+            // RFC 2833 telephone-event: event code, then RTP timestamp.
+            val event = packet[12].toInt() and 0xFF
+            val ts = ((packet[4].toInt() and 0xFF) shl 24) or
+                ((packet[5].toInt() and 0xFF) shl 16) or
+                ((packet[6].toInt() and 0xFF) shl 8) or
+                (packet[7].toInt() and 0xFF)
+            if (event in 0..11 && ts != lastDtmfTs) {
+                lastDtmfTs = ts
+                val digit = "0123456789*#"[event]
+                onDtmf?.invoke(digit)
+            }
+            return
         }
         if (pt != 0 && pt != 8) return
         val pcm = if (pt == 8) decodeAlaw(packet.copyOfRange(12, packet.size))

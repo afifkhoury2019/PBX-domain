@@ -892,7 +892,7 @@ edit(ui, "    </androidx.constraintlayout.widget.ConstraintLayout>\n\n</layout>"
      '            android:layout_marginTop="20dp"\n'
      '            android:layout_marginStart="16dp"\n'
      '            android:layout_marginEnd="16dp"\n'
-     '            android:text="Call screen theme"\n'
+     '            android:text="Call screen style"\n'
      '            app:layout_constraintTop_toBottomOf="@id/color_spinner"\n'
      '            app:layout_constraintStart_toStartOf="parent"\n'
      '            app:layout_constraintEnd_toEndOf="parent"/>\n\n'
@@ -1055,13 +1055,13 @@ settings_fragment = os.path.join(MAIN, "java", "org", "linphone", "ui", "main", 
 edit(settings_fragment, "        binding.viewModel = viewModel",
      "        binding.viewModel = viewModel\n"
      "        val afifStyleAdapter = android.widget.ArrayAdapter(\n"
-     "            requireContext(), R.layout.generic_dropdown_cell, org.linphone.AfifTheme.labels()\n"
+     "            requireContext(), R.layout.generic_dropdown_cell, org.linphone.AfifCallStyle.labels()\n"
      "        )\n"
      "        binding.userInterfaceSettings.afifStyleSpinner.adapter = afifStyleAdapter\n"
-     "        binding.userInterfaceSettings.afifStyleSpinner.setSelection(org.linphone.AfifTheme.index(requireContext()))\n"
+     "        binding.userInterfaceSettings.afifStyleSpinner.setSelection(org.linphone.AfifCallStyle.index(requireContext()))\n"
      "        binding.userInterfaceSettings.afifStyleSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {\n"
      "            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {\n"
-     "                org.linphone.AfifTheme.setIndex(requireContext(), position)\n"
+     "                org.linphone.AfifCallStyle.apply(requireContext(), position)\n"
      "            }\n"
      "            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}\n"
      "        }\n"

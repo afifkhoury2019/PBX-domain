@@ -133,8 +133,8 @@ public sealed class MediaOps
             b.Write(outA);
             recorder?.Write(outA, outB);
             // keypad from a phone travels as RFC 2833 events, so pass it on; GSM DTMF is already in the audio
-            if (a.Kind == "sip") while (a.Digits.TryDequeue(out var d)) b.SendDtmf(d);
-            if (b.Kind == "sip") while (b.Digits.TryDequeue(out var d)) a.SendDtmf(d);
+            if (a.Kind is "sip" or "ws") while (a.Digits.TryDequeue(out var d)) b.SendDtmf(d);
+            if (b.Kind is "sip" or "ws") while (b.Digits.TryDequeue(out var d)) a.SendDtmf(d);
             return true;
         }));
         try

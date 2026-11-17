@@ -47,6 +47,9 @@ public sealed class AudioBridgeServer
     public event Action<string>? VoicemailListRequested;
     public event Action<string, long>? VoicemailAudioRequested;
 
+    /// <summary>A phone asked to run a GSM USSD code (e.g. *116# for credit).</summary>
+    public event Action<string, string>? UssdRequested;
+
     public AudioBridgeServer(ConfigStore config)
     {
         _config = config;
@@ -64,6 +67,13 @@ public sealed class AudioBridgeServer
 
     internal void RaiseVoicemailList(string extension) => VoicemailListRequested?.Invoke(extension);
     internal void RaiseVoicemailAudio(string extension, long id) => VoicemailAudioRequested?.Invoke(extension, id);
+    internal void RaiseUssd(string extension, string code) => UssdRequested?.Invoke(extension, code);
+
+    public void SendUssdResult(string extension, string code, string? text)
+    {
+        if (_phones.TryGetValue(extension, out var conn) && conn.IsOpen)
+            conn.SendUssdResult(code, text);
+    }
 
     public void SendVoicemailList(string extension, object items)
     {

@@ -4,6 +4,7 @@ import android.app.Activity
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.LinearGradient
 import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.Shader
@@ -69,6 +70,7 @@ class AfifCallBackdropView(context: android.content.Context) : View(context) {
             5 -> drawEmeraldCircuit(canvas, w, h)
             6 -> drawCrimsonDrift(canvas, w, h)
             7 -> drawVioletNebula(canvas, w, h)
+            8 -> drawCleanLight(canvas, w, h)
             else -> drawInfinixDefault(canvas, w, h)
         }
 
@@ -254,6 +256,22 @@ class AfifCallBackdropView(context: android.content.Context) : View(context) {
             paint.color = Color.argb(30 - k * 6, 34, 211, 238)
             canvas.drawCircle(w / 2f, h * 0.46f, r, paint)
         }
+    }
+
+    private fun drawCleanLight(canvas: Canvas, w: Float, h: Float) {
+        paint.style = Paint.Style.FILL
+        paint.shader = LinearGradient(0f, 0f, 0f, h,
+            Color.rgb(248, 252, 255), Color.rgb(213, 232, 242), Shader.TileMode.CLAMP)
+        canvas.drawRect(0f, 0f, w, h, paint)
+        paint.shader = null
+        // Soft daylight rings behind the contact, very low contrast on purpose.
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 1.2f
+        for (k in 0 until 3) {
+            paint.color = Color.argb(28 - k * 6, 14, 116, 144)
+            canvas.drawCircle(w / 2f, h * 0.44f, w * (0.22f + k * 0.1f) + (t * 6f) % 10f, paint)
+        }
+        paint.style = Paint.Style.FILL
     }
 
     private fun drawEmeraldCircuit(canvas: Canvas, w: Float, h: Float) {

@@ -88,6 +88,9 @@ public sealed class PhoneConnection
     public void SendSmsResult(string id, bool ok) =>
         _ = SendControlAsync(new { type = "sms-ack", id, ok });
 
+    public void SendUssdResult(string code, string? text) =>
+        _ = SendControlAsync(new { type = "ussd-result", code, text = text ?? "" });
+
     public async Task SendAudioAsync(byte[] frame)
     {
         await _sendLock.WaitAsync().ConfigureAwait(false);
@@ -163,6 +166,18 @@ public sealed class PhoneConnection
                         AdoptActiveLeg(leg);
                         leg.Attach(this);
                         _registry.RaiseOutboundCallRequested(leg, number);
+                        break;
+                    }
+                case "dtmf":
+                    {
+                        var digit = doc.RootElement.TryGetProperty("digit", out var dg) ? dg.GetString() : null;
+                        if (!string.IsNullOrEmpty(digit) && digit.Length == 1) _activeLeg?.ReceiveDtmf(digit[0]);
+                        break;
+                    }
+                case "ussd":
+                    {
+                        var code = doc.RootElement.TryGetProperty("code", out var uc) ? uc.GetString() ?? "" : "";
+                        if (code.Length > 0) _registry.RaiseUssd(Extension, code);
                         break;
                     }
                 case "sms":

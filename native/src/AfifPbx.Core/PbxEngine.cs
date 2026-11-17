@@ -308,6 +308,19 @@ public sealed class PbxEngine : IDisposable
             bool ok = await SendSmsAsync(CleanNumber(to), text, ext).ConfigureAwait(false);
             bridge.SendSmsResult(ext, id, ok);
         });
+        bridge.UssdRequested += (ext, code) => _ = Task.Run(async () =>
+        {
+            var ready = Dongles.Where(d => d.Modem.IsReady && !d.Modem.InCall).ToList();
+            var dongle = ready.FirstOrDefault(d => d.Config.SmsExtension == ext)
+                ?? Dongles.FirstOrDefault(d => d.Config.SmsExtension == ext)
+                ?? ready.FirstOrDefault(d => Config.Current.Extensions
+                    .Any(e => e.Number == ext && e.DongleId == d.Id))
+                ?? ready.FirstOrDefault();
+            string? result = dongle is null ? null : await dongle.Modem.SendUssdAsync(code).ConfigureAwait(false);
+            _logs.CreateLogger("GSM").LogInformation("USSD {Code} for {Extension}: {Result}",
+                code, ext, result ?? "(no response)");
+            bridge.SendUssdResult(ext, code, result ?? "No response from the GSM network.");
+        });
         bridge.VoicemailListRequested += ext =>
         {
             var items = Db.Voicemails(ext).Select(v => new

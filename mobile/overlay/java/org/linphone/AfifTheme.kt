@@ -6,6 +6,7 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.view.View
+import android.widget.TextView
 
 /**
  * AFIF Phone visual styles. These are intentionally not clones of the Infinix
@@ -36,7 +37,8 @@ object AfifTheme {
         // New originals: circuit-trace green, drifting-ember crimson, nebula violet.
         Style("Emerald Circuit", intArrayOf(0xFF04120D.toInt(), 0xFF0C3B2E.toInt()), 0xFF059669.toInt(), 0xFF123528.toInt(), 0xFF10B981.toInt(), 6f),
         Style("Crimson Drift", intArrayOf(0xFF14020A.toInt(), 0xFF4A0A1E.toInt()), 0xFFBE123C.toInt(), 0xFF3A1020.toInt(), 0xFFE11D48.toInt(), 7f),
-        Style("Violet Nebula", intArrayOf(0xFF0A0415.toInt(), 0xFF2D1B4E.toInt()), 0xFF6D28D9.toInt(), 0xFF251638.toInt(), 0xFFA78BFA.toInt(), 11f)
+        Style("Violet Nebula", intArrayOf(0xFF0A0415.toInt(), 0xFF2D1B4E.toInt()), 0xFF6D28D9.toInt(), 0xFF251638.toInt(), 0xFFA78BFA.toInt(), 11f),
+        Style("Clean Light", intArrayOf(0xFFF4F9FD.toInt(), 0xFFDCEAF3.toInt()), 0xFF0E7490.toInt(), 0xFFE8F4F8.toInt(), 0xFF0E7490.toInt(), 1f)
     )
 
     fun index(context: Context): Int =
@@ -104,6 +106,14 @@ object AfifTheme {
         styleControl(decline, Color.rgb(229, 57, 53), 14f)
         for (id in intArrayOf(R.id.toggle_mute_mic, R.id.change_audio_output, R.id.toggle_video, R.id.recording)) {
             styleControl(root.findViewById(id), s.accent, 10f)
+        }
+        // Clean Light has a pale backdrop: Linphone's built-in white name/address
+        // would disappear, so switch those labels to dark ink.
+        val light = index(root.context) == 8
+        val ink = if (light) 0xFF102A3A.toInt() else Color.WHITE
+        for (id in intArrayOf(R.id.name, R.id.address, R.id.call_direction_label,
+                R.id.early_media_name, R.id.early_media_address)) {
+            root.findViewById<TextView>(id)?.setTextColor(ink)
         }
     }
 
