@@ -104,6 +104,8 @@ class AfifSipBridgeService : Service() {
 
     private var sip: DatagramSocket? = null
     private var sipThread: Thread? = null
+    private var lastDtmfDigit: Char = ' '
+    private var lastDtmfAt: Long = 0
     private val dialogs = ConcurrentHashMap<String, Dialog>()
     private val contacts = ConcurrentHashMap<String, Contact>()
 
@@ -431,7 +433,7 @@ class AfifSipBridgeService : Service() {
 
     private fun startRtp(d: Dialog, sdp: Sdp) {
         val rtp = d.rtp ?: Rtp(0).also { d.rtp = it }
-        rtp.onDtmf = { digit -> send(JSONObject().put("type", "dtmf").put("digit", digit.toString())) }
+        rtp.onDtmf = { digit -> forwardDtmf(digit) }
         rtp.start(InetAddress.getByName("127.0.0.1"), sdp.port, sdp.payloadType) { pcm ->
             ws?.send(ByteString.of(*pcm))
         }
@@ -552,11 +554,19 @@ class AfifSipBridgeService : Service() {
         val body = sipBody(msg)
         val digit = Regex("Signal=([0-9*#])").find(body)?.groupValues?.getOrNull(1)
             ?: Regex("^\\s*([0-9*#])\\s*$").find(body)?.groupValues?.getOrNull(1)
-        if (!digit.isNullOrEmpty()) {
-            send(JSONObject().put("type", "dtmf").put("digit", digit))
-            Log.i("AFIF-BRIDGE", "DTMF -> GSM: $digit")
-        }
+        if (!digit.isNullOrEmpty()) forwardDtmf(digit[0])
         respond(msg, 200, "OK")
+    }
+
+    private fun forwardDtmf(digit: Char) {
+        val now = System.currentTimeMillis()
+        // Linphone can emit both RFC 2833 and SIP INFO for the same key press.
+        // Collapse the duplicate; two tones would enter the IVR as "11".
+        if (digit == lastDtmfDigit && now - lastDtmfAt < 350) return
+        lastDtmfDigit = digit
+        lastDtmfAt = now
+        send(JSONObject().put("type", "dtmf").put("digit", digit.toString()))
+        Log.i("AFIF-BRIDGE", "DTMF -> GSM: $digit")
     }
 
     private fun localSms(from: String, text: String) {
