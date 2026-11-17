@@ -492,8 +492,52 @@ public sealed class HuaweiModem : IDisposable
         {
             // Some Huawei firmware builds expose VTS instead of ^DTMF.
             var v = await at.SendAsync($"AT+VTS=\"{digit}\"", 2500).ConfigureAwait(false);
-            if (!v.Ok) _log.LogWarning("DTMF {Digit} failed: ^DTMF={A}, VTS={B}", digit, r.Final, v.Final);
+            if (!v.Ok)
+            {
+                // E303 firmware rejects both AT DTMF commands while DDSETEX is
+                // carrying the call. Fall back to real in-band DTMF tones through
+                // the already-open PCM path so the GSM IVR still receives them.
+                _log.LogWarning("DTMF {Digit}: AT rejected (^DTMF={A}, VTS={B}); using in-band tone",
+                    digit, r.Final, v.Final);
+                await Task.Run(() => PlayDtmfTone(digit)).ConfigureAwait(false);
+            }
         }
+    }
+
+    private void PlayDtmfTone(char digit)
+    {
+        int row, col;
+        switch (digit)
+        {
+            case '1': row = 697; col = 1209; break;
+            case '2': row = 697; col = 1336; break;
+            case '3': row = 697; col = 1477; break;
+            case '4': row = 770; col = 1209; break;
+            case '5': row = 770; col = 1336; break;
+            case '6': row = 770; col = 1477; break;
+            case '7': row = 852; col = 1209; break;
+            case '8': row = 852; col = 1336; break;
+            case '9': row = 852; col = 1477; break;
+            case '*': row = 941; col = 1209; break;
+            case '0': row = 941; col = 1336; break;
+            case '#': row = 941; col = 1477; break;
+            default: return;
+        }
+        // 200 ms of dual-tone, then 60 ms of silence: standard IVR-safe timing.
+        var tone = new short[Audio.FrameSamples];
+        for (int f = 0; f < 10; f++)
+        {
+            for (int i = 0; i < tone.Length; i++)
+            {
+                double t = (f * tone.Length + i) / 8000.0;
+                double s = Math.Sin(2 * Math.PI * row * t) + Math.Sin(2 * Math.PI * col * t);
+                tone[i] = (short)(s * 0.22 * short.MaxValue);
+            }
+            WriteAudio(tone);
+            Thread.Sleep(20);
+        }
+        var silence = new short[Audio.FrameSamples];
+        for (int f = 0; f < 3; f++) { WriteAudio(silence); Thread.Sleep(20); }
     }
 
     /// <summary>Send a 20 ms frame of PCM to the network side of the active call.</summary>
