@@ -1,0 +1,16 @@
+11-17 14:58:41.602  3442  3442 W Monkey  : args: [-p, com.afiftech.phone, -c, android.intent.category.LAUNCHER, 1]
+11-17 14:58:41.603  3442  3442 W Monkey  :  arg: "com.afiftech.phone"
+11-17 14:58:41.603  3442  3442 W Monkey  : data="com.afiftech.phone"
+11-17 14:58:42.098  3509  3509 W .afiftech.phone: Unexpected CPU variant for x86: x86_64.
+11-17 14:58:42.098  3509  3509 W .afiftech.phone: Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, tremont, kabylake, default
+11-17 14:58:42.110  3509  3509 E .afiftech.phone: Not starting debugger since process cannot load the jdwp agent.
+11-17 14:58:43.655   515   537 W ActivityTaskManager: Activity top resumed state loss timeout for ActivityRecord{a7d1537 u0 com.afiftech.phone/org.linphone.ui.main.MainActivity t8}
+11-17 14:58:43.655   515   537 W ActivityTaskManager: Activity pause timeout for ActivityRecord{a7d1537 u0 com.afiftech.phone/org.linphone.ui.main.MainActivity t8}
+11-17 14:58:48.271  1449  3344 W libc    : Access denied finding property "ro.hardware.chipname"
+11-17 14:58:49.615  3509  3509 W .afiftech.phone: Long monitor contention with owner Core Thread (3584) at boolean org.linphone.core.CoreImpl.isAutoIterateEnabled()(r8-map-id-f400cf036aaceb2f97960960df9227d0590d5e7ba03b39eb048e979dbf7db155:8) waiters=0 in org.linphone.core.MagicSearch org.linphone.core.CoreImpl.createMagicSearch() for 3.685s
+11-17 14:58:52.061   515  2520 W InputManager-JNI: Input channel object '32dd700 Splash Screen com.afiftech.phone (client)' was disposed without first being removed with the input manager!
+11-17 14:58:55.882  1449  3247 W libc    : Access denied finding property "ro.hardware.chipname"
+11-17 14:59:30.264  3509  3509 E .afiftech.phone: Invalid resource ID 0x00000000.
+11-17 14:59:34.732  5112  5212 W libc    : Access denied finding property "ro.hardware.chipname"
+11-17 14:59:45.346   515  2698 E AppOps  : Bad call made by uid 10097. Package "com.afiftech.phone" does not belong to uid 10097.
+11-17 14:59:45.348   515  2698 E AppOps  : java.lang.SecurityException: Specified package "com.afiftech.phone" under uid 10097 but it is not
